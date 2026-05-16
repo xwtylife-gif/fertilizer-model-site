@@ -1,0 +1,8 @@
+references/
+*.7z
+*.zip
+*.rar
+*.pdf
+.DS_Store
+node_modules/
+dist/

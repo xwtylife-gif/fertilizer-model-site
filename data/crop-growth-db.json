@@ -1,0 +1,470 @@
+{
+  "schemaVersion": "2026-05-dndc-lite-crop-db-v1",
+  "name": "DNDC-lite crop growth database",
+  "description": "Ten-crop parameter database for daily crop growth, irrigation, fertilization, plant protection scheduling, and yield prediction. It uses DNDC-style drivers and daily balance logic without copying DNDC or ORIFORI source code.",
+  "units": {
+    "area": "ha",
+    "yield": "kg/ha fresh or harvest product weight",
+    "water": "mm/season",
+    "nutrients": "kg/ha as N, P2O5, K2O",
+    "temperature": "degree Celsius",
+    "gdd": "degree-days above crop base temperature"
+  },
+  "modelLogic": {
+    "drivers": ["climate", "soil", "crop", "management"],
+    "dailySteps": [
+      "calculate daily growing degree days from mean temperature and crop base temperature",
+      "advance phenology by accumulated GDD divided by crop thermal requirement",
+      "estimate stage crop evapotranspiration from ET0 and Kc curve",
+      "update root-zone soil water balance with rainfall, irrigation, ETc, drainage, and soil water storage",
+      "calculate daily nutrient demand by stage uptake curve and daily phenology increment",
+      "estimate nitrogen stress from available mineral N, water stress, and crop demand",
+      "apply management events for basal fertilizer, topdressing, irrigation, pest scouting, and harvest",
+      "convert cumulative temperature, water stress, nitrogen stress, pH, salinity, and management timing to yield factor"
+    ],
+    "formulas": {
+      "dailyGdd": "max(0, min(tmean, thermal.maxTempC) - thermal.baseTempC)",
+      "phenology": "min(1, accumulatedGdd / thermal.totalGddC)",
+      "stageEtc": "dailyET0 * interpolatedKc(stage)",
+      "rootZoneTawMm": "(soil.fieldCapacity - soil.wiltingPoint) * rootDepthMm",
+      "waterStress": "availableWaterMm / max(readilyAvailableWaterMm, 1)",
+      "dailyNutrientDemand": "seasonNutrientDemand * stage.nutrientShare * dailyPhenologyIncrement / stage.thermalShare",
+      "yieldFactor": "temperatureFactor * waterFactor * nitrogenFactor * soilFactor * salinityFactor * facilityFactor"
+    },
+    "dndcMapping": {
+      "thermal.totalGddC": "DNDC-style CropTDD",
+      "water.seasonRequirementMm": "DNDC-style crop water requirement converted to seasonal water planning",
+      "nutrientDemandKgHa.n": "DNDC-style max crop N demand, used for daily N demand",
+      "biomassPartition": "DNDC-style mature biomass partition among harvest organ, leaves/stems, and roots",
+      "cnRatio": "DNDC-style C/N ratio for plant organs, used later for residue and N balance"
+    }
+  },
+  "validationRules": {
+    "requiredCropCount": 10,
+    "requiredCropFields": [
+      "id",
+      "name",
+      "category",
+      "thermal",
+      "water",
+      "nutrientDemandKgHa",
+      "yieldPotentialKgHa",
+      "stages",
+      "managementTemplates",
+      "sourceIds"
+    ],
+    "stageRules": [
+      "stage thermalShare values must sum to 1.00",
+      "stage nShare, pShare, kShare, and waterShare must each sum to 1.00",
+      "stage order must be continuous from early establishment to maturity",
+      "each crop must include at least one fertilizer, irrigation, scouting, and harvest recommendation"
+    ],
+    "rangeRules": {
+      "thermal": "baseTempC < optTempC < maxTempC and totalGddC > 0",
+      "water": "seasonRequirementMm must fall inside validationRangeMm when FAO crop water range exists",
+      "nutrients": "N, P2O5, and K2O must be non-negative and realistic for the target yield class",
+      "soil": "phMin < phOptLow <= phOptHigh < phMax; salinityThresholdDsM > 0"
+    }
+  },
+  "sources": [
+    {
+      "id": "dndc-manual-local",
+      "type": "local-reference",
+      "title": "DNDC模型使用手册（中文版）",
+      "path": "/Users/xiaosen/Documents/05-网站与代码/DNDC模型使用手册（中文版）(1).pdf",
+      "usedFor": ["model structure", "crop parameter categories", "daily simulation sequence", "management event categories"]
+    },
+    {
+      "id": "orifori-dndc-notes-local",
+      "type": "local-reference",
+      "title": "ORIFORI（保密）.7z 中 DNDC 注释目录",
+      "path": "/Users/xiaosen/Documents/05-网站与代码/ORIFORI（保密）.7z",
+      "usedFor": ["high-level variable mapping only", "thermal demand", "water demand", "nitrogen demand", "balance-check concepts"],
+      "safetyNote": "No source code or compressed reference files are copied into this database or project."
+    },
+    {
+      "id": "fao-crop-info",
+      "type": "public-reference",
+      "title": "FAO Crop Water Information",
+      "url": "https://www.fao.org/land-water/databases-and-software/crop-information/en/",
+      "usedFor": ["crop water requirement categories", "crop water productivity context"]
+    },
+    {
+      "id": "fao-crop-water-needs",
+      "type": "public-reference",
+      "title": "FAO Chapter 3: Crop Water Needs",
+      "url": "https://www.fao.org/3/S2022E/s2022e07.htm",
+      "usedFor": ["seasonal crop water validation ranges for wheat, maize, rice, cotton, potato, tomato"]
+    },
+    {
+      "id": "fao56-kc",
+      "type": "public-reference",
+      "title": "FAO Irrigation and Drainage Paper 56 crop coefficient method",
+      "url": "https://www.fao.org/4/f2430e/f2430e.pdf",
+      "usedFor": ["Kc curve structure", "ETc = ET0 x Kc logic", "irrigation scheduling concepts"]
+    }
+  ],
+  "crops": [
+    {
+      "id": "tomato",
+      "name": "番茄",
+      "latinName": "Solanum lycopersicum",
+      "category": "茄果类蔬菜",
+      "screeningReason": "设施和露地均常见，水肥响应强，适合作为模型校准基准作物。",
+      "thermal": { "baseTempC": 10, "optTempC": 25, "maxTempC": 35, "totalGddC": 1450, "typicalSeasonDays": [120, 170] },
+      "water": {
+        "seasonRequirementMm": 520,
+        "validationRangeMm": [400, 800],
+        "kc": { "initial": 0.6, "mid": 1.15, "late": 0.8 },
+        "readilyAvailableDepletionFraction": 0.35,
+        "criticalStages": ["开花坐果期", "膨果采收期"]
+      },
+      "nutrientDemandKgHa": { "n": 360, "p2o5": 150, "k2o": 510 },
+      "yieldPotentialKgHa": 108000,
+      "marketablePart": "鲜果",
+      "biomassPartition": { "marketable": 0.52, "leafStem": 0.33, "root": 0.15 },
+      "cnRatio": { "marketable": 18, "leafStem": 28, "root": 36 },
+      "soilPreference": { "phMin": 5.8, "phOptLow": 6.0, "phOptHigh": 7.5, "phMax": 8.2, "salinityThresholdDsM": 2.0 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.22 },
+      "stages": [
+        { "id": "establishment", "name": "缓苗/幼苗期", "thermalShare": 0.16, "nShare": 0.16, "pShare": 0.24, "kShare": 0.12, "waterShare": 0.15, "targetSoilWaterPctFieldCapacity": [65, 75] },
+        { "id": "vegetative", "name": "营养生长期", "thermalShare": 0.22, "nShare": 0.28, "pShare": 0.25, "kShare": 0.20, "waterShare": 0.22, "targetSoilWaterPctFieldCapacity": [60, 75] },
+        { "id": "flowering", "name": "开花坐果期", "thermalShare": 0.24, "nShare": 0.30, "pShare": 0.28, "kShare": 0.34, "waterShare": 0.30, "targetSoilWaterPctFieldCapacity": [70, 85] },
+        { "id": "filling", "name": "膨果采收期", "thermalShare": 0.26, "nShare": 0.22, "pShare": 0.18, "kShare": 0.28, "waterShare": 0.25, "targetSoilWaterPctFieldCapacity": [70, 85] },
+        { "id": "maturity", "name": "后期拉秧", "thermalShare": 0.12, "nShare": 0.04, "pShare": 0.05, "kShare": 0.06, "waterShare": 0.08, "targetSoilWaterPctFieldCapacity": [55, 70] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥：有机肥+磷钾为主，氮肥不宜过量", "营养生长期：平衡型水溶肥少量多次", "开花坐果后：转高钾并补钙镁", "采收期：按产量和叶色维持低量追肥"],
+        "irrigation": ["定植水浇透", "开花前控水促根", "坐果和膨果期小水勤灌", "采前避免忽干忽湿"],
+        "plantProtection": ["缓苗期查根腐和猝倒", "开花期重点查灰霉、叶霉和白粉虱", "采收期监测螨类、裂果和脐腐"],
+        "fieldOperations": ["吊蔓或插架", "整枝打杈", "摘除老叶病叶", "分批采收"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+    },
+    {
+      "id": "cucumber",
+      "name": "黄瓜",
+      "latinName": "Cucumis sativus",
+      "category": "瓜菜类蔬菜",
+      "screeningReason": "设施高频种植，根系浅、需水敏感，适合验证日尺度水分调度。",
+      "thermal": { "baseTempC": 10, "optTempC": 26, "maxTempC": 36, "totalGddC": 1180, "typicalSeasonDays": [90, 130] },
+      "water": {
+        "seasonRequirementMm": 430,
+        "validationRangeMm": [350, 600],
+        "kc": { "initial": 0.5, "mid": 1.0, "late": 0.8 },
+        "readilyAvailableDepletionFraction": 0.30,
+        "criticalStages": ["初花结瓜期", "盛瓜期"]
+      },
+      "nutrientDemandKgHa": { "n": 330, "p2o5": 120, "k2o": 420 },
+      "yieldPotentialKgHa": 97500,
+      "marketablePart": "鲜瓜",
+      "biomassPartition": { "marketable": 0.50, "leafStem": 0.35, "root": 0.15 },
+      "cnRatio": { "marketable": 16, "leafStem": 26, "root": 34 },
+      "soilPreference": { "phMin": 5.8, "phOptLow": 6.0, "phOptHigh": 7.4, "phMax": 8.0, "salinityThresholdDsM": 1.8 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.18 },
+      "stages": [
+        { "id": "establishment", "name": "缓苗/幼苗期", "thermalShare": 0.15, "nShare": 0.14, "pShare": 0.22, "kShare": 0.12, "waterShare": 0.14, "targetSoilWaterPctFieldCapacity": [65, 75] },
+        { "id": "vegetative", "name": "抽蔓期", "thermalShare": 0.21, "nShare": 0.30, "pShare": 0.24, "kShare": 0.20, "waterShare": 0.22, "targetSoilWaterPctFieldCapacity": [65, 78] },
+        { "id": "flowering", "name": "初花结瓜期", "thermalShare": 0.24, "nShare": 0.32, "pShare": 0.28, "kShare": 0.34, "waterShare": 0.30, "targetSoilWaterPctFieldCapacity": [75, 88] },
+        { "id": "filling", "name": "盛瓜期", "thermalShare": 0.30, "nShare": 0.20, "pShare": 0.18, "kShare": 0.28, "waterShare": 0.27, "targetSoilWaterPctFieldCapacity": [75, 88] },
+        { "id": "maturity", "name": "后期", "thermalShare": 0.10, "nShare": 0.04, "pShare": 0.08, "kShare": 0.06, "waterShare": 0.07, "targetSoilWaterPctFieldCapacity": [60, 72] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥重视有机质和磷钾", "抽蔓期平衡追肥", "结瓜后增加钾钙供应", "盛瓜期少量多次随水追肥"],
+        "irrigation": ["缓苗后适当蹲苗", "结瓜后保持土壤湿润", "高温期缩短灌水间隔", "避免大水漫灌伤根"],
+        "plantProtection": ["重点监测霜霉病、白粉病、蓟马和蚜虫", "设施栽培优先通风降湿", "采收期严格遵守安全间隔期"],
+        "fieldOperations": ["吊蔓绑蔓", "摘除下部老叶", "及时采收商品瓜"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao56-kc"]
+    },
+    {
+      "id": "pepper",
+      "name": "辣椒",
+      "latinName": "Capsicum annuum",
+      "category": "茄果类蔬菜",
+      "screeningReason": "南北方均常见，坐果期对水肥和温度胁迫敏感。",
+      "thermal": { "baseTempC": 12, "optTempC": 26, "maxTempC": 36, "totalGddC": 1350, "typicalSeasonDays": [120, 160] },
+      "water": {
+        "seasonRequirementMm": 420,
+        "validationRangeMm": [350, 650],
+        "kc": { "initial": 0.6, "mid": 1.05, "late": 0.8 },
+        "readilyAvailableDepletionFraction": 0.35,
+        "criticalStages": ["开花坐果期", "膨果采收期"]
+      },
+      "nutrientDemandKgHa": { "n": 300, "p2o5": 120, "k2o": 390 },
+      "yieldPotentialKgHa": 63000,
+      "marketablePart": "鲜椒",
+      "biomassPartition": { "marketable": 0.48, "leafStem": 0.36, "root": 0.16 },
+      "cnRatio": { "marketable": 18, "leafStem": 30, "root": 38 },
+      "soilPreference": { "phMin": 5.8, "phOptLow": 6.2, "phOptHigh": 7.4, "phMax": 8.0, "salinityThresholdDsM": 1.7 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.15 },
+      "stages": [
+        { "id": "establishment", "name": "缓苗期", "thermalShare": 0.16, "nShare": 0.16, "pShare": 0.24, "kShare": 0.14, "waterShare": 0.15, "targetSoilWaterPctFieldCapacity": [62, 74] },
+        { "id": "vegetative", "name": "营养生长期", "thermalShare": 0.24, "nShare": 0.28, "pShare": 0.24, "kShare": 0.20, "waterShare": 0.23, "targetSoilWaterPctFieldCapacity": [62, 76] },
+        { "id": "flowering", "name": "开花坐果期", "thermalShare": 0.24, "nShare": 0.30, "pShare": 0.28, "kShare": 0.32, "waterShare": 0.29, "targetSoilWaterPctFieldCapacity": [70, 84] },
+        { "id": "filling", "name": "膨果采收期", "thermalShare": 0.26, "nShare": 0.22, "pShare": 0.18, "kShare": 0.28, "waterShare": 0.25, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "maturity", "name": "后期", "thermalShare": 0.10, "nShare": 0.04, "pShare": 0.06, "kShare": 0.06, "waterShare": 0.08, "targetSoilWaterPctFieldCapacity": [55, 70] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥以有机肥、磷钾和中微量元素为主", "门椒坐稳后开始追肥", "盛果期高钾并补钙镁", "后期控氮防贪青"],
+        "irrigation": ["缓苗期控水促根", "坐果期保持水分稳定", "高温期小水勤灌", "雨后及时排水"],
+        "plantProtection": ["监测蚜虫、蓟马和病毒病", "高湿期防炭疽病和疫病", "用药注意轮换作用机制"],
+        "fieldOperations": ["整枝打杈", "支架防倒伏", "分批采收"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao56-kc"]
+    },
+    {
+      "id": "strawberry",
+      "name": "草莓",
+      "latinName": "Fragaria x ananassa",
+      "category": "浆果类",
+      "screeningReason": "高价值设施作物，适合验证温湿度、病害和采收期管理。",
+      "thermal": { "baseTempC": 5, "optTempC": 22, "maxTempC": 32, "totalGddC": 1050, "typicalSeasonDays": [130, 190] },
+      "water": {
+        "seasonRequirementMm": 360,
+        "validationRangeMm": [300, 520],
+        "kc": { "initial": 0.4, "mid": 0.85, "late": 0.75 },
+        "readilyAvailableDepletionFraction": 0.30,
+        "criticalStages": ["开花坐果期", "果实膨大采收期"]
+      },
+      "nutrientDemandKgHa": { "n": 240, "p2o5": 105, "k2o": 330 },
+      "yieldPotentialKgHa": 39000,
+      "marketablePart": "鲜果",
+      "biomassPartition": { "marketable": 0.45, "leafStem": 0.38, "root": 0.17 },
+      "cnRatio": { "marketable": 17, "leafStem": 25, "root": 35 },
+      "soilPreference": { "phMin": 5.4, "phOptLow": 5.8, "phOptHigh": 6.8, "phMax": 7.4, "salinityThresholdDsM": 1.2 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.2 },
+      "stages": [
+        { "id": "establishment", "name": "定植缓苗期", "thermalShare": 0.18, "nShare": 0.14, "pShare": 0.26, "kShare": 0.12, "waterShare": 0.16, "targetSoilWaterPctFieldCapacity": [65, 78] },
+        { "id": "vegetative", "name": "花芽分化/营养期", "thermalShare": 0.24, "nShare": 0.28, "pShare": 0.26, "kShare": 0.20, "waterShare": 0.22, "targetSoilWaterPctFieldCapacity": [60, 75] },
+        { "id": "flowering", "name": "开花坐果期", "thermalShare": 0.22, "nShare": 0.30, "pShare": 0.26, "kShare": 0.32, "waterShare": 0.28, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "filling", "name": "果实膨大采收期", "thermalShare": 0.28, "nShare": 0.22, "pShare": 0.16, "kShare": 0.30, "waterShare": 0.27, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "maturity", "name": "采后恢复", "thermalShare": 0.08, "nShare": 0.06, "pShare": 0.06, "kShare": 0.06, "waterShare": 0.07, "targetSoilWaterPctFieldCapacity": [58, 72] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["定植前补有机质和磷钾", "缓苗后低浓度促根", "花果期增加钾钙硼", "采后补肥恢复树势"],
+        "irrigation": ["定植后保湿不积水", "花期避免叶面长时间潮湿", "采收期小水勤灌", "阴雨天减少灌水"],
+        "plantProtection": ["花期重点防灰霉病", "高温干燥期查红蜘蛛", "采收期用药严守安全间隔"],
+        "fieldOperations": ["摘老叶病叶", "放蜂或辅助授粉", "分级采收"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao56-kc"]
+    },
+    {
+      "id": "blueberry",
+      "name": "蓝莓",
+      "latinName": "Vaccinium spp.",
+      "category": "浆果类",
+      "screeningReason": "高价值酸性土作物，适合验证土壤 pH、盐分和根区水分约束。",
+      "thermal": { "baseTempC": 5, "optTempC": 22, "maxTempC": 32, "totalGddC": 1250, "typicalSeasonDays": [160, 220] },
+      "water": {
+        "seasonRequirementMm": 520,
+        "validationRangeMm": [450, 700],
+        "kc": { "initial": 0.5, "mid": 1.05, "late": 0.75 },
+        "readilyAvailableDepletionFraction": 0.25,
+        "criticalStages": ["开花坐果期", "果实膨大成熟期"]
+      },
+      "nutrientDemandKgHa": { "n": 150, "p2o5": 60, "k2o": 180 },
+      "yieldPotentialKgHa": 13500,
+      "marketablePart": "鲜果",
+      "biomassPartition": { "marketable": 0.35, "leafStem": 0.45, "root": 0.20 },
+      "cnRatio": { "marketable": 20, "leafStem": 35, "root": 45 },
+      "soilPreference": { "phMin": 4.2, "phOptLow": 4.5, "phOptHigh": 5.5, "phMax": 6.2, "salinityThresholdDsM": 0.8 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.08 },
+      "stages": [
+        { "id": "establishment", "name": "萌芽展叶期", "thermalShare": 0.18, "nShare": 0.16, "pShare": 0.20, "kShare": 0.14, "waterShare": 0.18, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "vegetative", "name": "新梢生长期", "thermalShare": 0.24, "nShare": 0.30, "pShare": 0.25, "kShare": 0.20, "waterShare": 0.24, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "flowering", "name": "开花坐果期", "thermalShare": 0.20, "nShare": 0.24, "pShare": 0.25, "kShare": 0.30, "waterShare": 0.24, "targetSoilWaterPctFieldCapacity": [72, 85] },
+        { "id": "filling", "name": "果实膨大成熟期", "thermalShare": 0.26, "nShare": 0.22, "pShare": 0.20, "kShare": 0.30, "waterShare": 0.26, "targetSoilWaterPctFieldCapacity": [72, 85] },
+        { "id": "maturity", "name": "采后花芽分化", "thermalShare": 0.12, "nShare": 0.08, "pShare": 0.10, "kShare": 0.06, "waterShare": 0.08, "targetSoilWaterPctFieldCapacity": [62, 78] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["优先使用酸性有机覆盖和铵态氮", "避免硝态氮和盐分累积", "果实膨大期稳钾并补微量元素", "采后补肥促进花芽分化"],
+        "irrigation": ["根系浅，保持基质湿润透气", "滴灌少量多次", "高盐水源需先检测", "雨后注意排水"],
+        "plantProtection": ["花果期查灰霉和果蝇", "高湿期查叶斑病", "采收期清除落果"],
+        "fieldOperations": ["维持有机覆盖", "修剪弱枝", "分批轻采轻放"]
+      },
+      "sourceIds": ["dndc-manual-local"]
+    },
+    {
+      "id": "cotton",
+      "name": "棉花",
+      "latinName": "Gossypium hirsutum",
+      "category": "经济作物",
+      "screeningReason": "西北大田代表作物，需水量高，适合验证滴灌和花铃期水肥调度。",
+      "thermal": { "baseTempC": 12, "optTempC": 28, "maxTempC": 38, "totalGddC": 1850, "typicalSeasonDays": [150, 190] },
+      "water": {
+        "seasonRequirementMm": 720,
+        "validationRangeMm": [700, 1300],
+        "kc": { "initial": 0.4, "mid": 1.18, "late": 0.6 },
+        "readilyAvailableDepletionFraction": 0.45,
+        "criticalStages": ["花铃期"]
+      },
+      "nutrientDemandKgHa": { "n": 270, "p2o5": 105, "k2o": 270 },
+      "yieldPotentialKgHa": 6300,
+      "marketablePart": "籽棉",
+      "biomassPartition": { "marketable": 0.38, "leafStem": 0.42, "root": 0.20 },
+      "cnRatio": { "marketable": 35, "leafStem": 45, "root": 55 },
+      "soilPreference": { "phMin": 6.0, "phOptLow": 6.5, "phOptHigh": 8.0, "phMax": 8.5, "salinityThresholdDsM": 3.0 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.0 },
+      "stages": [
+        { "id": "establishment", "name": "苗期", "thermalShare": 0.18, "nShare": 0.12, "pShare": 0.24, "kShare": 0.10, "waterShare": 0.16, "targetSoilWaterPctFieldCapacity": [58, 72] },
+        { "id": "vegetative", "name": "蕾期", "thermalShare": 0.24, "nShare": 0.30, "pShare": 0.24, "kShare": 0.22, "waterShare": 0.22, "targetSoilWaterPctFieldCapacity": [62, 76] },
+        { "id": "flowering", "name": "花铃期", "thermalShare": 0.30, "nShare": 0.38, "pShare": 0.30, "kShare": 0.42, "waterShare": 0.38, "targetSoilWaterPctFieldCapacity": [70, 85] },
+        { "id": "filling", "name": "吐絮期", "thermalShare": 0.20, "nShare": 0.16, "pShare": 0.16, "kShare": 0.20, "waterShare": 0.18, "targetSoilWaterPctFieldCapacity": [58, 72] },
+        { "id": "maturity", "name": "成熟收获期", "thermalShare": 0.08, "nShare": 0.04, "pShare": 0.06, "kShare": 0.06, "waterShare": 0.06, "targetSoilWaterPctFieldCapacity": [45, 60] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥重视磷钾和有机质", "蕾期追氮促稳长", "花铃期是氮钾高峰", "吐絮期控氮控水促成熟"],
+        "irrigation": ["苗期轻控促根", "蕾期逐步增加滴灌", "花铃期保证水分", "吐絮后逐步停水"],
+        "plantProtection": ["苗期查棉蚜和蓟马", "花铃期查棉铃虫和红蜘蛛", "后期注意烂铃风险"],
+        "fieldOperations": ["中耕除草", "化控塑形", "适时打顶", "脱叶催熟和采收"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+    },
+    {
+      "id": "maize",
+      "name": "玉米",
+      "latinName": "Zea mays",
+      "category": "粮食作物",
+      "screeningReason": "核心粮食作物，适合作为积温、氮肥和关键水分窗口模型校准作物。",
+      "thermal": { "baseTempC": 8, "optTempC": 28, "maxTempC": 38, "totalGddC": 1550, "typicalSeasonDays": [110, 150] },
+      "water": {
+        "seasonRequirementMm": 560,
+        "validationRangeMm": [500, 800],
+        "kc": { "initial": 0.3, "mid": 1.2, "late": 0.55 },
+        "readilyAvailableDepletionFraction": 0.50,
+        "criticalStages": ["大喇叭口/抽雄吐丝期", "灌浆期"]
+      },
+      "nutrientDemandKgHa": { "n": 300, "p2o5": 120, "k2o": 240 },
+      "yieldPotentialKgHa": 11700,
+      "marketablePart": "籽粒",
+      "biomassPartition": { "marketable": 0.48, "leafStem": 0.34, "root": 0.18 },
+      "cnRatio": { "marketable": 45, "leafStem": 60, "root": 70 },
+      "soilPreference": { "phMin": 5.5, "phOptLow": 6.0, "phOptHigh": 7.8, "phMax": 8.3, "salinityThresholdDsM": 2.5 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.0 },
+      "stages": [
+        { "id": "establishment", "name": "播种出苗期", "thermalShare": 0.14, "nShare": 0.10, "pShare": 0.24, "kShare": 0.10, "waterShare": 0.12, "targetSoilWaterPctFieldCapacity": [55, 70] },
+        { "id": "vegetative", "name": "拔节期", "thermalShare": 0.28, "nShare": 0.34, "pShare": 0.26, "kShare": 0.26, "waterShare": 0.26, "targetSoilWaterPctFieldCapacity": [60, 75] },
+        { "id": "flowering", "name": "大喇叭口/抽雄吐丝期", "thermalShare": 0.24, "nShare": 0.36, "pShare": 0.28, "kShare": 0.34, "waterShare": 0.34, "targetSoilWaterPctFieldCapacity": [70, 85] },
+        { "id": "filling", "name": "灌浆期", "thermalShare": 0.24, "nShare": 0.16, "pShare": 0.16, "kShare": 0.22, "waterShare": 0.22, "targetSoilWaterPctFieldCapacity": [62, 78] },
+        { "id": "maturity", "name": "成熟期", "thermalShare": 0.10, "nShare": 0.04, "pShare": 0.06, "kShare": 0.08, "waterShare": 0.06, "targetSoilWaterPctFieldCapacity": [45, 60] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["种肥或基肥保证磷钾", "拔节期追施氮肥", "大喇叭口前后是追肥关键窗口", "后期避免过量氮导致倒伏"],
+        "irrigation": ["播后保墒", "拔节期视墒补水", "抽雄吐丝期严防干旱", "灌浆期保持中等水分"],
+        "plantProtection": ["心叶期监测草地贪夜蛾和玉米螟", "高湿密植地块查大斑病和锈病", "穗期查蚜虫"],
+        "fieldOperations": ["查苗补苗", "中耕培土", "适时机械收获"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+    },
+    {
+      "id": "wheat",
+      "name": "小麦",
+      "latinName": "Triticum aestivum",
+      "category": "粮食作物",
+      "screeningReason": "核心口粮作物，适合验证越冬、返青拔节和灌浆期管理。",
+      "thermal": { "baseTempC": 0, "optTempC": 20, "maxTempC": 32, "totalGddC": 1850, "typicalSeasonDays": [180, 250] },
+      "water": {
+        "seasonRequirementMm": 520,
+        "validationRangeMm": [450, 650],
+        "kc": { "initial": 0.3, "mid": 1.15, "late": 0.35 },
+        "readilyAvailableDepletionFraction": 0.55,
+        "criticalStages": ["返青拔节期", "孕穗抽穗期", "灌浆期"]
+      },
+      "nutrientDemandKgHa": { "n": 270, "p2o5": 105, "k2o": 150 },
+      "yieldPotentialKgHa": 9300,
+      "marketablePart": "籽粒",
+      "biomassPartition": { "marketable": 0.45, "leafStem": 0.37, "root": 0.18 },
+      "cnRatio": { "marketable": 42, "leafStem": 70, "root": 75 },
+      "soilPreference": { "phMin": 5.8, "phOptLow": 6.0, "phOptHigh": 8.0, "phMax": 8.5, "salinityThresholdDsM": 2.2 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.0 },
+      "stages": [
+        { "id": "establishment", "name": "播种出苗/越冬", "thermalShare": 0.22, "nShare": 0.18, "pShare": 0.32, "kShare": 0.18, "waterShare": 0.18, "targetSoilWaterPctFieldCapacity": [55, 72] },
+        { "id": "vegetative", "name": "返青拔节期", "thermalShare": 0.26, "nShare": 0.34, "pShare": 0.24, "kShare": 0.26, "waterShare": 0.24, "targetSoilWaterPctFieldCapacity": [62, 78] },
+        { "id": "flowering", "name": "孕穗抽穗期", "thermalShare": 0.20, "nShare": 0.28, "pShare": 0.22, "kShare": 0.28, "waterShare": 0.28, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "filling", "name": "灌浆期", "thermalShare": 0.24, "nShare": 0.16, "pShare": 0.16, "kShare": 0.20, "waterShare": 0.24, "targetSoilWaterPctFieldCapacity": [62, 78] },
+        { "id": "maturity", "name": "成熟期", "thermalShare": 0.08, "nShare": 0.04, "pShare": 0.06, "kShare": 0.08, "waterShare": 0.06, "targetSoilWaterPctFieldCapacity": [45, 60] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥保证磷钾和部分氮", "返青拔节追氮", "弱苗早追、旺苗推迟", "后期叶面补肥防早衰"],
+        "irrigation": ["足墒播种", "返青拔节视墒浇水", "抽穗扬花期避免干旱", "成熟前控水防倒伏"],
+        "plantProtection": ["返青期查纹枯和麦蜘蛛", "抽穗扬花期重点防赤霉病", "灌浆期一喷三防"],
+        "fieldOperations": ["镇压保墒", "化控防倒伏", "蜡熟末期收获"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+    },
+    {
+      "id": "rice",
+      "name": "水稻",
+      "latinName": "Oryza sativa",
+      "category": "粮食作物",
+      "screeningReason": "水田代表作物，适合单独验证淹灌、干湿交替和氮素管理。",
+      "thermal": { "baseTempC": 10, "optTempC": 28, "maxTempC": 38, "totalGddC": 1650, "typicalSeasonDays": [120, 170] },
+      "water": {
+        "seasonRequirementMm": 650,
+        "validationRangeMm": [450, 700],
+        "kc": { "initial": 1.05, "mid": 1.2, "late": 0.9 },
+        "readilyAvailableDepletionFraction": 0.20,
+        "waterMode": "flooded_or_alternate_wetting_drying",
+        "criticalStages": ["分蘖期", "拔节孕穗期", "抽穗灌浆期"]
+      },
+      "nutrientDemandKgHa": { "n": 240, "p2o5": 90, "k2o": 210 },
+      "yieldPotentialKgHa": 10800,
+      "marketablePart": "稻谷",
+      "biomassPartition": { "marketable": 0.44, "leafStem": 0.38, "root": 0.18 },
+      "cnRatio": { "marketable": 45, "leafStem": 65, "root": 70 },
+      "soilPreference": { "phMin": 5.0, "phOptLow": 5.5, "phOptHigh": 7.5, "phMax": 8.2, "salinityThresholdDsM": 2.0 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.0 },
+      "stages": [
+        { "id": "establishment", "name": "移栽返青期", "thermalShare": 0.16, "nShare": 0.18, "pShare": 0.28, "kShare": 0.16, "waterShare": 0.20, "targetSoilWaterPctFieldCapacity": [90, 100] },
+        { "id": "vegetative", "name": "分蘖期", "thermalShare": 0.26, "nShare": 0.34, "pShare": 0.24, "kShare": 0.26, "waterShare": 0.28, "targetSoilWaterPctFieldCapacity": [85, 100] },
+        { "id": "flowering", "name": "拔节孕穗期", "thermalShare": 0.26, "nShare": 0.30, "pShare": 0.24, "kShare": 0.34, "waterShare": 0.28, "targetSoilWaterPctFieldCapacity": [90, 100] },
+        { "id": "filling", "name": "抽穗灌浆期", "thermalShare": 0.22, "nShare": 0.14, "pShare": 0.16, "kShare": 0.18, "waterShare": 0.18, "targetSoilWaterPctFieldCapacity": [80, 95] },
+        { "id": "maturity", "name": "黄熟期", "thermalShare": 0.10, "nShare": 0.04, "pShare": 0.08, "kShare": 0.06, "waterShare": 0.06, "targetSoilWaterPctFieldCapacity": [60, 75] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥保证磷钾和分蘖起步氮", "分蘖肥看苗施用", "穗肥重视氮钾平衡", "后期控氮防贪青"],
+        "irrigation": ["返青期浅水", "分蘖期浅水促蘖并适时晒田", "孕穗抽穗期保持水层", "灌浆期干湿交替，收前断水"],
+        "plantProtection": ["分蘖期查纹枯病和稻飞虱", "破口抽穗期防稻瘟和稻曲病", "用药避开高温和扬花敏感期"],
+        "fieldOperations": ["移栽或直播查苗", "晒田控苗", "收前排水", "适时机收"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+    },
+    {
+      "id": "potato",
+      "name": "马铃薯",
+      "latinName": "Solanum tuberosum",
+      "category": "薯类作物",
+      "screeningReason": "高产块茎作物，钾需求高，适合验证块茎膨大期水肥模型。",
+      "thermal": { "baseTempC": 5, "optTempC": 18, "maxTempC": 30, "totalGddC": 1250, "typicalSeasonDays": [100, 145] },
+      "water": {
+        "seasonRequirementMm": 560,
+        "validationRangeMm": [500, 700],
+        "kc": { "initial": 0.5, "mid": 1.15, "late": 0.75 },
+        "readilyAvailableDepletionFraction": 0.35,
+        "criticalStages": ["现蕾开花/结薯期", "块茎膨大期"]
+      },
+      "nutrientDemandKgHa": { "n": 270, "p2o5": 120, "k2o": 450 },
+      "yieldPotentialKgHa": 48000,
+      "marketablePart": "鲜薯",
+      "biomassPartition": { "marketable": 0.58, "leafStem": 0.27, "root": 0.15 },
+      "cnRatio": { "marketable": 20, "leafStem": 35, "root": 42 },
+      "soilPreference": { "phMin": 5.0, "phOptLow": 5.5, "phOptHigh": 6.8, "phMax": 7.5, "salinityThresholdDsM": 1.6 },
+      "facilityFactor": { "openField": 1.0, "greenhouse": 1.04 },
+      "stages": [
+        { "id": "establishment", "name": "播种出苗期", "thermalShare": 0.18, "nShare": 0.14, "pShare": 0.26, "kShare": 0.12, "waterShare": 0.15, "targetSoilWaterPctFieldCapacity": [58, 72] },
+        { "id": "vegetative", "name": "团棵期", "thermalShare": 0.22, "nShare": 0.30, "pShare": 0.24, "kShare": 0.24, "waterShare": 0.22, "targetSoilWaterPctFieldCapacity": [62, 78] },
+        { "id": "flowering", "name": "现蕾开花/结薯期", "thermalShare": 0.28, "nShare": 0.34, "pShare": 0.28, "kShare": 0.38, "waterShare": 0.34, "targetSoilWaterPctFieldCapacity": [70, 85] },
+        { "id": "filling", "name": "块茎膨大期", "thermalShare": 0.22, "nShare": 0.18, "pShare": 0.16, "kShare": 0.20, "waterShare": 0.23, "targetSoilWaterPctFieldCapacity": [68, 82] },
+        { "id": "maturity", "name": "成熟期", "thermalShare": 0.10, "nShare": 0.04, "pShare": 0.06, "kShare": 0.06, "waterShare": 0.06, "targetSoilWaterPctFieldCapacity": [45, 60] }
+      ],
+      "managementTemplates": {
+        "fertilization": ["基肥重视有机肥、磷和钾", "团棵期追氮促苗", "结薯到膨大期提高钾供应", "后期控氮促薯皮成熟"],
+        "irrigation": ["播后保墒", "结薯期保持水分稳定", "膨大期避免干旱和大水交替", "收前控水"],
+        "plantProtection": ["结薯期重点防晚疫病", "高湿期预警早疫病", "轮作减轻土传病害"],
+        "fieldOperations": ["中耕培土", "控旺", "杀秧后适时收获"]
+      },
+      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+    }
+  ]
+}

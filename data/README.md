@@ -1,0 +1,63 @@
+# 作物生长数据库说明
+
+核心文件：
+
+- `crop-growth-db.json`：DNDC-lite 作物生长数据库，当前包含 10 种常见作物。
+- `crop-growth-db.js`：由 JSON 自动生成的浏览器加载版本，用于静态网页直接双击运行。
+
+验证命令：
+
+```bash
+npm run build:data
+npm run validate:data
+```
+
+## 作物列表
+
+- 番茄
+- 黄瓜
+- 辣椒
+- 草莓
+- 蓝莓
+- 棉花
+- 玉米
+- 小麦
+- 水稻
+- 马铃薯
+
+## 数据结构
+
+每个作物包含：
+
+- `thermal`：基础温度、最适温度、最高温度、全生育期积温。
+- `water`：全季需水量、FAO 参考校验范围、Kc 曲线、允许亏缺比例、关键需水阶段。
+- `nutrientDemandKgHa`：目标产量下 N、P2O5、K2O 全季需求。
+- `yieldPotentialKgHa`：当前模型使用的高产管理潜力产量。
+- `biomassPartition`：成熟期收获器官、茎叶、根系生物量分配。
+- `cnRatio`：收获器官、茎叶和根系 C/N 比，用于后续残体和氮素平衡。
+- `soilPreference`：pH 和盐分适宜范围。
+- `stages`：生育阶段热量、水分、N/P/K 需求比例。
+- `managementTemplates`：施肥、灌溉、植保、田间操作模板。
+
+## DNDC-lite 映射
+
+该数据库不复制 DNDC 或 ORIFORI 源码，只抽象保留 DNDC 对作物模型最有用的参数框架：
+
+- `thermal.totalGddC` 对应 DNDC 的作物生长积温需求。
+- `water.seasonRequirementMm` 和 `water.kc` 用于逐日 ETc 与水分胁迫计算。
+- `nutrientDemandKgHa.n` 用于每日氮需求和氮素胁迫计算。
+- `biomassPartition` 与 `cnRatio` 支撑后续根、茎叶、收获器官分配和残体还田。
+- `managementTemplates` 对应 DNDC 的管理事件思想，包括施肥、灌溉、植保和收获。
+
+## 校验规则
+
+验证脚本会检查：
+
+- 作物数量是否为 10。
+- 必填字段是否完整。
+- 温度参数顺序是否合理。
+- 需水量是否落在参考范围内。
+- 生育阶段 `thermalShare`、`nShare`、`pShare`、`kShare`、`waterShare` 是否分别合计为 1。
+- 生物量分配是否合计为 1。
+- 每个作物是否包含施肥、灌溉、植保、田间操作建议。
+- 来源引用是否存在。

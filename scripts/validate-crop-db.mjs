@@ -4,7 +4,11 @@ import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dbPath = resolve(here, "../data/crop-growth-db.json");
+const regionPath = resolve(here, "../data/agro-region-db.json");
+const managementPath = resolve(here, "../data/management-plan-db.json");
 const db = JSON.parse(readFileSync(dbPath, "utf8"));
+const regionDb = JSON.parse(readFileSync(regionPath, "utf8"));
+const managementDb = JSON.parse(readFileSync(managementPath, "utf8"));
 
 const requiredCropFields = db.validationRules.requiredCropFields;
 const tolerance = 0.001;
@@ -86,6 +90,52 @@ for (const crop of db.crops) {
   check(soil.salinityThresholdDsM > 0, `${crop.id} salinity threshold must be positive`);
 }
 
+const allSourceIds = new Set([
+  ...db.sources.map((source) => source.id),
+  ...regionDb.sources.map((source) => source.id)
+]);
+const regionIds = new Set(regionDb.regions.map((region) => region.id));
+const fertilizerProductIds = new Set(managementDb.fertilizerProducts.map((product) => product.id));
+
+check(regionDb.regions.length >= 1, "region database must include at least one region");
+for (const region of regionDb.regions) {
+  check(region.id && region.name, "each region must include id and name");
+  check(region.climateNormal.monthlyTmeanC.length === 12, `${region.id} must include 12 monthly temperatures`);
+  check(region.climateNormal.monthlyRainMm.length === 12, `${region.id} must include 12 monthly rainfall values`);
+  check(region.climateNormal.monthlyEt0Mm.length === 12, `${region.id} must include 12 monthly ET0 values`);
+  for (const sourceId of region.sourceIds) {
+    check(allSourceIds.has(sourceId), `${region.id} references unknown source: ${sourceId}`);
+  }
+}
+
+check(managementDb.plans.length >= 1, "management database must include at least one plan");
+for (const plan of managementDb.plans) {
+  const crop = db.crops.find((item) => item.id === plan.cropId);
+  const stageIds = new Set((crop?.stages || []).map((stage) => stage.id));
+
+  check(cropIds.has(plan.cropId), `${plan.id} references unknown crop: ${plan.cropId}`);
+  check(regionIds.has(plan.regionId), `${plan.id} references unknown region: ${plan.regionId}`);
+  check(plan.eventTemplates.length >= 8, `${plan.id} should include a full management calendar`);
+  check(plan.gpt55Optimization?.model === "gpt-5.5", `${plan.id} must declare gpt-5.5 optimization profile`);
+  for (const item of [...plan.nutrientBudgetKgMu.preferredSideDeep, ...plan.nutrientBudgetKgMu.traditionalSplit]) {
+    check(fertilizerProductIds.has(item.productId), `${plan.id} references unknown fertilizer product: ${item.productId}`);
+  }
+  for (const event of plan.eventTemplates) {
+    check(event.id && event.title && event.action, `${plan.id} has an incomplete event template`);
+    check(event.timing?.type, `${plan.id}/${event.id} missing timing type`);
+    if (["stageStart", "stageFraction"].includes(event.timing?.type)) {
+      check(stageIds.has(event.timing.stageId), `${plan.id}/${event.id} references unknown stage: ${event.timing.stageId}`);
+    }
+    if (event.timing?.type === "stageFraction") {
+      check(event.timing.fraction >= 0 && event.timing.fraction <= 1, `${plan.id}/${event.id} has invalid stage fraction`);
+    }
+    check(event.fertilizer && event.water && event.check, `${plan.id}/${event.id} must include fertilizer, water, and check text`);
+  }
+  for (const sourceId of plan.sourceIds) {
+    check(allSourceIds.has(sourceId), `${plan.id} references unknown source: ${sourceId}`);
+  }
+}
+
 if (warnings.length) {
   console.warn("Warnings:");
   for (const message of warnings) console.warn(`- ${message}`);
@@ -97,4 +147,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validation passed: ${db.crops.length} crops, ${db.sources.length} sources, ${db.schemaVersion}`);
+console.log(`Validation passed: ${db.crops.length} crops, ${regionDb.regions.length} regions, ${managementDb.plans.length} management plans`);

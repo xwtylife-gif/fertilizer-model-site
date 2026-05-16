@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-05-dndc-lite-crop-db-v1",
   "name": "DNDC-lite crop growth database",
-  "description": "Ten-crop parameter database for daily crop growth, irrigation, fertilization, plant protection scheduling, and yield prediction. It uses DNDC-style drivers and daily balance logic without copying DNDC or ORIFORI source code.",
+  "description": "Ten-crop parameter database for daily crop growth, irrigation, fertilization, plant protection scheduling, and yield prediction. It uses DNDC-style drivers and daily balance logic without copying private reference files or model source code.",
   "units": {
     "area": "ha",
     "yield": "kg/ha fresh or harvest product weight",
@@ -68,19 +68,11 @@
   },
   "sources": [
     {
-      "id": "dndc-manual-local",
-      "type": "local-reference",
-      "title": "DNDC模型使用手册（中文版）",
-      "path": "/Users/xiaosen/Documents/05-网站与代码/DNDC模型使用手册（中文版）(1).pdf",
-      "usedFor": ["model structure", "crop parameter categories", "daily simulation sequence", "management event categories"]
-    },
-    {
-      "id": "orifori-dndc-notes-local",
-      "type": "local-reference",
-      "title": "ORIFORI（保密）.7z 中 DNDC 注释目录",
-      "path": "/Users/xiaosen/Documents/05-网站与代码/ORIFORI（保密）.7z",
-      "usedFor": ["high-level variable mapping only", "thermal demand", "water demand", "nitrogen demand", "balance-check concepts"],
-      "safetyNote": "No source code or compressed reference files are copied into this database or project."
+      "id": "dndc-structure-reference",
+      "type": "internal-reference-summary",
+      "title": "DNDC-style crop model structure summary",
+      "usedFor": ["model structure", "crop parameter categories", "daily simulation sequence", "management event categories", "thermal demand", "water demand", "nitrogen demand"],
+      "safetyNote": "Reference files and model source packages are not included in this repository; this database stores only abstracted parameters and model concepts."
     },
     {
       "id": "fao-crop-info",
@@ -139,7 +131,7 @@
         "plantProtection": ["缓苗期查根腐和猝倒", "开花期重点查灰霉、叶霉和白粉虱", "采收期监测螨类、裂果和脐腐"],
         "fieldOperations": ["吊蔓或插架", "整枝打杈", "摘除老叶病叶", "分批采收"]
       },
-      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao-crop-water-needs", "fao56-kc"]
     },
     {
       "id": "cucumber",
@@ -175,7 +167,7 @@
         "plantProtection": ["重点监测霜霉病、白粉病、蓟马和蚜虫", "设施栽培优先通风降湿", "采收期严格遵守安全间隔期"],
         "fieldOperations": ["吊蔓绑蔓", "摘除下部老叶", "及时采收商品瓜"]
       },
-      "sourceIds": ["dndc-manual-local", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao56-kc"]
     },
     {
       "id": "pepper",
@@ -211,7 +203,7 @@
         "plantProtection": ["监测蚜虫、蓟马和病毒病", "高湿期防炭疽病和疫病", "用药注意轮换作用机制"],
         "fieldOperations": ["整枝打杈", "支架防倒伏", "分批采收"]
       },
-      "sourceIds": ["dndc-manual-local", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao56-kc"]
     },
     {
       "id": "strawberry",
@@ -247,7 +239,7 @@
         "plantProtection": ["花期重点防灰霉病", "高温干燥期查红蜘蛛", "采收期用药严守安全间隔"],
         "fieldOperations": ["摘老叶病叶", "放蜂或辅助授粉", "分级采收"]
       },
-      "sourceIds": ["dndc-manual-local", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao56-kc"]
     },
     {
       "id": "blueberry",
@@ -283,7 +275,7 @@
         "plantProtection": ["花果期查灰霉和果蝇", "高湿期查叶斑病", "采收期清除落果"],
         "fieldOperations": ["维持有机覆盖", "修剪弱枝", "分批轻采轻放"]
       },
-      "sourceIds": ["dndc-manual-local"]
+      "sourceIds": ["dndc-structure-reference"]
     },
     {
       "id": "cotton",
@@ -319,7 +311,7 @@
         "plantProtection": ["苗期查棉蚜和蓟马", "花铃期查棉铃虫和红蜘蛛", "后期注意烂铃风险"],
         "fieldOperations": ["中耕除草", "化控塑形", "适时打顶", "脱叶催熟和采收"]
       },
-      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao-crop-water-needs", "fao56-kc"]
     },
     {
       "id": "maize",
@@ -355,7 +347,7 @@
         "plantProtection": ["心叶期监测草地贪夜蛾和玉米螟", "高湿密植地块查大斑病和锈病", "穗期查蚜虫"],
         "fieldOperations": ["查苗补苗", "中耕培土", "适时机械收获"]
       },
-      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao-crop-water-needs", "fao56-kc"]
     },
     {
       "id": "wheat",
@@ -391,7 +383,7 @@
         "plantProtection": ["返青期查纹枯和麦蜘蛛", "抽穗扬花期重点防赤霉病", "灌浆期一喷三防"],
         "fieldOperations": ["镇压保墒", "化控防倒伏", "蜡熟末期收获"]
       },
-      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao-crop-water-needs", "fao56-kc"]
     },
     {
       "id": "rice",
@@ -428,7 +420,7 @@
         "plantProtection": ["分蘖期查纹枯病和稻飞虱", "破口抽穗期防稻瘟和稻曲病", "用药避开高温和扬花敏感期"],
         "fieldOperations": ["移栽或直播查苗", "晒田控苗", "收前排水", "适时机收"]
       },
-      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao-crop-water-needs", "fao56-kc"]
     },
     {
       "id": "potato",
@@ -464,7 +456,7 @@
         "plantProtection": ["结薯期重点防晚疫病", "高湿期预警早疫病", "轮作减轻土传病害"],
         "fieldOperations": ["中耕培土", "控旺", "杀秧后适时收获"]
       },
-      "sourceIds": ["dndc-manual-local", "fao-crop-water-needs", "fao56-kc"]
+      "sourceIds": ["dndc-structure-reference", "fao-crop-water-needs", "fao56-kc"]
     }
   ]
 }

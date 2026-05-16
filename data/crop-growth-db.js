@@ -1,7 +1,7 @@
 window.CROP_GROWTH_DB = {
   "schemaVersion": "2026-05-dndc-lite-crop-db-v1",
   "name": "DNDC-lite crop growth database",
-  "description": "Ten-crop parameter database for daily crop growth, irrigation, fertilization, plant protection scheduling, and yield prediction. It uses DNDC-style drivers and daily balance logic without copying DNDC or ORIFORI source code.",
+  "description": "Ten-crop parameter database for daily crop growth, irrigation, fertilization, plant protection scheduling, and yield prediction. It uses DNDC-style drivers and daily balance logic without copying private reference files or model source code.",
   "units": {
     "area": "ha",
     "yield": "kg/ha fresh or harvest product weight",
@@ -73,30 +73,19 @@ window.CROP_GROWTH_DB = {
   },
   "sources": [
     {
-      "id": "dndc-manual-local",
-      "type": "local-reference",
-      "title": "DNDC模型使用手册（中文版）",
-      "path": "/Users/xiaosen/Documents/05-网站与代码/DNDC模型使用手册（中文版）(1).pdf",
+      "id": "dndc-structure-reference",
+      "type": "internal-reference-summary",
+      "title": "DNDC-style crop model structure summary",
       "usedFor": [
         "model structure",
         "crop parameter categories",
         "daily simulation sequence",
-        "management event categories"
-      ]
-    },
-    {
-      "id": "orifori-dndc-notes-local",
-      "type": "local-reference",
-      "title": "ORIFORI（保密）.7z 中 DNDC 注释目录",
-      "path": "/Users/xiaosen/Documents/05-网站与代码/ORIFORI（保密）.7z",
-      "usedFor": [
-        "high-level variable mapping only",
+        "management event categories",
         "thermal demand",
         "water demand",
-        "nitrogen demand",
-        "balance-check concepts"
+        "nitrogen demand"
       ],
-      "safetyNote": "No source code or compressed reference files are copied into this database or project."
+      "safetyNote": "Reference files and model source packages are not included in this repository; this database stores only abstracted parameters and model concepts."
     },
     {
       "id": "fao-crop-info",
@@ -284,7 +273,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao-crop-water-needs",
         "fao56-kc"
       ]
@@ -442,7 +431,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao56-kc"
       ]
     },
@@ -599,7 +588,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao56-kc"
       ]
     },
@@ -756,7 +745,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao56-kc"
       ]
     },
@@ -913,7 +902,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local"
+        "dndc-structure-reference"
       ]
     },
     {
@@ -1069,7 +1058,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao-crop-water-needs",
         "fao56-kc"
       ]
@@ -1227,7 +1216,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao-crop-water-needs",
         "fao56-kc"
       ]
@@ -1386,7 +1375,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao-crop-water-needs",
         "fao56-kc"
       ]
@@ -1547,7 +1536,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao-crop-water-needs",
         "fao56-kc"
       ]
@@ -1705,7 +1694,7 @@ window.CROP_GROWTH_DB = {
         ]
       },
       "sourceIds": [
-        "dndc-manual-local",
+        "dndc-structure-reference",
         "fao-crop-water-needs",
         "fao56-kc"
       ]

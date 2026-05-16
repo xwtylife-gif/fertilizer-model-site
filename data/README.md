@@ -3,7 +3,10 @@
 核心文件：
 
 - `crop-growth-db.json`：DNDC-lite 作物生长数据库，当前包含 10 种常见作物。
+- `agro-region-db.json`：区域气候、土壤、播栽窗口和安全收获约束；当前先配置湖北江汉平原。
+- `management-plan-db.json`：地区化农事日程、肥料产品库和 GPT-5.5 审核契约；当前先实现湖北水稻。
 - `crop-growth-db.js`：由 JSON 自动生成的浏览器加载版本，用于静态网页直接双击运行。
+- `agro-region-db.js`、`management-plan-db.js`：由 JSON 自动生成的浏览器加载版本。
 
 验证命令：
 
@@ -39,11 +42,20 @@ npm run validate:data
 - `stages`：生育阶段热量、水分、N/P/K 需求比例。
 - `managementTemplates`：施肥、灌溉、植保、田间操作模板。
 
+区域与管理方案包含：
+
+- `climateNormal`：12 个月平均温度、降雨、ET0 和相对湿度，用于逐日插值。
+- `cropWindows`：作物在当地的推荐播栽期、谨慎播栽期、安全收获上限和低温阈值。
+- `fertilizerProducts`：肥料产品名、养分含量、适用环节和风险说明。
+- `eventTemplates`：从播栽到收获的管理事件，按起始日或生育阶段自动换算为实际日期。
+- `gpt55Optimization`：后续接入 GPT-5.5 的输入、输出和安全约束，限定 GPT 只做审核、优化和结构化补丁，不擅自改写模型日期或虚构农药产品。
+
 ## DNDC-lite 映射
 
-该数据库不复制 DNDC 或 ORIFORI 源码，只抽象保留 DNDC 对作物模型最有用的参数框架：
+该数据库不复制 DNDC 或任何内部源码，只抽象保留 DNDC 对作物模型最有用的参数框架：
 
 - `thermal.totalGddC` 对应 DNDC 的作物生长积温需求。
+- `cropWindows.regionalGddOverride` 用于地区/品种制度下的积温校正，例如湖北中稻采用更严格的区域积温需求。
 - `water.seasonRequirementMm` 和 `water.kc` 用于逐日 ETc 与水分胁迫计算。
 - `nutrientDemandKgHa.n` 用于每日氮需求和氮素胁迫计算。
 - `biomassPartition` 与 `cnRatio` 支撑后续根、茎叶、收获器官分配和残体还田。
@@ -61,3 +73,6 @@ npm run validate:data
 - 生物量分配是否合计为 1。
 - 每个作物是否包含施肥、灌溉、植保、田间操作建议。
 - 来源引用是否存在。
+- 区域月度气候数组是否为 12 个月。
+- 管理方案是否引用真实作物、真实区域、真实肥料产品和真实生育阶段。
+- 湖北水稻方案是否声明 GPT-5.5 审核配置。

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "2026-05-dndc-lite-region-db-v1",
+  "description": "Regional agro-climate and soil presets for daily thermal-time simulation. Monthly normals are interpolated to daily values by the model engine.",
+  "regions": [
+    {
+      "id": "hubei-jianghan",
+      "name": "湖北江汉平原",
+      "province": "湖北",
+      "representativeStation": "武汉/江汉平原综合代表",
+      "latitude": 30.6,
+      "altitudeM": 25,
+      "farmingSystem": "稻-油/稻-麦/一季中稻",
+      "climateNormal": {
+        "monthlyTmeanC": [4.2, 6.7, 11.4, 17.6, 22.7, 26.0, 28.8, 28.0, 23.7, 18.0, 11.8, 6.1],
+        "monthlyRainMm": [39, 55, 82, 122, 160, 193, 210, 135, 75, 68, 55, 30],
+        "monthlyEt0Mm": [35, 45, 75, 100, 125, 135, 150, 135, 95, 70, 45, 35],
+        "monthlyRhPct": [78, 76, 75, 76, 78, 82, 84, 82, 78, 76, 76, 77]
+      },
+      "soilPreset": {
+        "soilType": "水稻土",
+        "texture": "壤质黏土",
+        "ph": 6.4,
+        "organicMatterGkg": 28,
+        "alkaliHydrolyzableNKgHa": 150,
+        "availablePmgKg": 18,
+        "availableKmgKg": 110,
+        "fieldCapacity": 0.36,
+        "wiltingPoint": 0.18,
+        "percolationMmDay": 2.5
+      },
+      "cropWindows": {
+        "rice": {
+          "system": "中稻/一季稻移栽或直播",
+          "recommendedStart": ["05-15", "06-20"],
+          "cautionStart": ["06-21", "07-10"],
+          "latestRiskStart": "07-15",
+          "latestSafeHarvest": "10-25",
+          "absoluteHarvestLimit": "11-05",
+          "regionalGddOverride": 1850,
+          "minHeadingTmeanC": 22,
+          "minFillingTmeanC": 18,
+          "coldRiskTmeanC": 15,
+          "notes": [
+            "5月中旬至6月中旬更适合中稻形成充足营养生长期和安全灌浆窗口。",
+            "7月中旬后再播栽，中晚熟品种通常面临抽穗灌浆低温和积温不足风险，需要改早熟品种或改作。"
+          ]
+        }
+      },
+      "sourceIds": ["hubei-2026-fertilization", "hubei-rice-pest-green-control", "moa-rice-pest-2024"]
+    }
+  ],
+  "sources": [
+    {
+      "id": "hubei-2026-fertilization",
+      "title": "湖北省2026年水稻、玉米、大豆科学施肥提单产技术指导意见",
+      "url": "https://nyt.hubei.gov.cn/bmdt/yw/gfxx/202604/t20260408_5909503.shtml",
+      "usedFor": ["rice fertilizer timing", "urea tillering range", "potassium chloride panicle fertilizer", "side-deep and slow-release fertilizer notes"]
+    },
+    {
+      "id": "hubei-rice-pest-green-control",
+      "title": "湖北省水稻病虫害绿色防控技术方案",
+      "url": "https://nyt.hubei.gov.cn/bmdt/yw/zbzh/202109/t20210909_3747697.shtml",
+      "usedFor": ["green pest management", "seed treatment", "seedling protection", "integrated pest management"]
+    },
+    {
+      "id": "moa-rice-pest-2024",
+      "title": "2024年水稻重大病虫害防控技术方案",
+      "url": "https://www.moa.gov.cn/gk/nszd_1/nszd_2/202403/t20240308_6450966.htm",
+      "usedFor": ["major rice pest list", "panicle protection timing", "scouting and prevention structure"]
+    },
+    {
+      "id": "openai-gpt55-model",
+      "title": "GPT-5.5 Model | OpenAI API",
+      "url": "https://developers.openai.com/api/docs/models/gpt-5.5",
+      "usedFor": ["AI optimization profile", "reasoning model selection"]
+    }
+  ]
+}

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build:data": "node scripts/build-browser-data.mjs",
-    "validate:data": "node scripts/validate-crop-db.mjs"
+    "validate:data": "node scripts/validate-crop-db.mjs",
+    "validate:evaluation": "node scripts/validate-evaluation-db.mjs"
   }
 }

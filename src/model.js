@@ -563,6 +563,350 @@
     };
   }
 
+  function localValidationChecklist(planOrEvaluationSample) {
+    const sample = planOrEvaluationSample || {};
+    const input = sample.input_summary || {};
+    const output = sample.dndc_lite_output || {};
+    const existing = sample.local_validation_result || {};
+    const redFlags = new Set(existing.red_flags || []);
+    const dataGaps = new Set(existing.data_gaps || output.risk_assessment_result?.data_gaps || sample.gpt55_review_contract?.data_gaps || []);
+
+    const unit_check = [];
+    const date_window_check = [];
+    const gdd_check = [];
+    const phenology_consistency_check = [];
+    const water_balance_check = [];
+    const nitrogen_budget_check = [];
+    const fertilizer_schedule_check = [];
+    const risk_check = [];
+    const evidence_check = [];
+
+    if (hasText(output.fertilizer_schedule_result?.unit, "kg/亩") || hasText(output.fertilizer_schedule_result?.unit, "kg/公顷")) {
+      unit_check.push(`肥料单位已声明为 ${output.fertilizer_schedule_result.unit}。`);
+    } else {
+      unit_check.push("肥料用量缺少 kg/亩 或 kg/公顷 单位声明。");
+      redFlags.add("肥料用量单位不完整");
+    }
+
+    if (hasText(JSON.stringify(output.nitrogen_demand_result || {}), "N") || hasText(JSON.stringify(output.nitrogen_demand_result || {}), "nitrogen")) {
+      unit_check.push("氮素预算单独记录，避免与 P2O5/K2O 混用。");
+    } else {
+      unit_check.push("氮素预算字段不清晰。");
+      redFlags.add("N/P2O5/K2O 口径可能混用");
+    }
+
+    if (hasText(output.irrigation_schedule_result?.unit, "mm") || hasText(output.irrigation_schedule_result?.unit, "cm")) {
+      unit_check.push(`水分单位已声明为 ${output.irrigation_schedule_result.unit}。`);
+    } else {
+      unit_check.push("水分单位缺少 mm 或水层厘米说明。");
+      redFlags.add("水分单位不完整");
+    }
+
+    if (isLegalDate(sample.start_date)) {
+      date_window_check.push(`播栽日期 ${sample.start_date} 合法。`);
+    } else {
+      date_window_check.push(`播栽日期 ${sample.start_date || "未填写"} 不合法。`);
+      redFlags.add("播栽日期不合法");
+    }
+
+    const startWindow = output.phenology_result?.start_window;
+    if (startWindow === "late" || output.gdd_result?.missing_gdd_c > 0) {
+      date_window_check.push("播栽日期导致晚播或积温不足，必须标红并停止自动执行日程。");
+      redFlags.add("播栽窗口或积温不足");
+    } else if (startWindow === "caution") {
+      date_window_check.push("处于谨慎窗口：需结合当地气象和品种熟期人工确认。");
+    } else if (startWindow === "recommended") {
+      date_window_check.push("处于推荐窗口，可给出较高的日期/GDD 可信度。");
+    } else {
+      date_window_check.push("该作物缺少本地区播栽窗口配置。");
+      redFlags.add("区域播栽窗口未配置");
+    }
+
+    const requiredGdd = numberOrZero(output.gdd_result?.required_gdd_c);
+    const accumulatedGdd = numberOrZero(output.gdd_result?.accumulated_gdd_c);
+    const missingGdd = numberOrZero(output.gdd_result?.missing_gdd_c);
+    if (requiredGdd < 0 || accumulatedGdd < 0 || missingGdd < 0) {
+      gdd_check.push("GDD 出现负值，违反积温规则。");
+      redFlags.add("GDD 负值");
+    } else {
+      gdd_check.push(`GDD 检查：需求 ${requiredGdd}，累计 ${accumulatedGdd}，缺口 ${missingGdd}。`);
+    }
+
+    if (accumulatedGdd > requiredGdd * 1.25 && requiredGdd > 0) {
+      gdd_check.push("累计积温超过合理范围，需要检查气候数据或作物参数。");
+      redFlags.add("GDD 超出合理范围");
+    }
+
+    const yieldEstimate = numberOrZero(output.yield_prediction_result?.estimate_kg_mu);
+    if (missingGdd > 0 && yieldEstimate >= 650) {
+      gdd_check.push("GDD 不足却仍给出高产预测，必须标红。");
+      redFlags.add("积温不足却预测高产");
+    }
+
+    if (output.phenology_result?.phenology_status === "incomplete_or_high_risk") {
+      phenology_consistency_check.push("物候未完成或高风险，不得输出自动执行方案。");
+    } else {
+      phenology_consistency_check.push("物候阶段与 GDD 进度基本一致。");
+    }
+
+    const waterCondition = input.water_condition || output.water_balance_result?.water_condition;
+    if (waterCondition === "dry") {
+      water_balance_check.push("干旱场景必须提示水分胁迫，并检查灌溉触发。");
+      if (!hasText(output.water_balance_result?.irrigation_logic, "irrigation")) redFlags.add("干旱场景缺少灌溉触发说明");
+    } else if (waterCondition === "wet") {
+      water_balance_check.push("雨水偏多场景必须减少灌溉并提示排水、渍涝和病害风险。");
+      if (!hasText(output.water_balance_result?.irrigation_logic, "drainage")) redFlags.add("雨水偏多却缺少排水逻辑");
+    } else {
+      water_balance_check.push("常规水分场景需保持浅水、晒田、孕穗稳水和收前排水一致。");
+    }
+
+    const nitrogenLevel = input.nitrogen_supply_level || output.nitrogen_demand_result?.nitrogen_supply_level;
+    if (nitrogenLevel === "low") {
+      nitrogen_budget_check.push("氮供应不足：必须提示氮胁迫，不能给高可信高产结论。");
+      redFlags.add("氮供应不足需人工复核");
+    } else if (nitrogenLevel === "high") {
+      nitrogen_budget_check.push("氮供应过量：必须提示倒伏、贪青、病害和环境风险。");
+      redFlags.add("氮供应过量需人工复核");
+    } else {
+      nitrogen_budget_check.push("氮素需求应随物候变化，基肥/分蘖肥/穗肥逻辑基本可检查。");
+    }
+
+    if (output.fertilizer_schedule_result?.has_dates) {
+      fertilizer_schedule_check.push("施肥日程包含日期化事件。");
+    } else {
+      fertilizer_schedule_check.push("施肥日程缺少可执行日期，不得直接给新手执行。");
+      redFlags.add("施肥事件缺少日期");
+    }
+
+    if (Array.isArray(output.fertilizer_schedule_result?.required_events) && output.fertilizer_schedule_result.required_events.length >= 3) {
+      fertilizer_schedule_check.push(`施肥事件包含：${output.fertilizer_schedule_result.required_events.join("、")}。`);
+    } else {
+      fertilizer_schedule_check.push("施肥事件过于笼统，缺少基肥、分蘖肥、穗肥等结构。");
+      redFlags.add("施肥事件过于笼统");
+    }
+
+    const confidence = output.yield_prediction_result?.confidence_level;
+    if ((dataGaps.has("缺少本地试验产量") || includesGap(dataGaps, "试验产量")) && confidence === "high") {
+      risk_check.push("缺少本地试验产量时，产量预测 confidence 不能为 high。");
+      redFlags.add("产量预测 confidence 过高");
+    } else {
+      risk_check.push("产量预测只能作为估算，不允许承诺保底增产。");
+    }
+
+    if (output.risk_assessment_result?.no_guaranteed_yield_claim !== true) {
+      redFlags.add("缺少不承诺保底增产声明");
+    }
+
+    ["真实土壤检测", "逐日气象", "本地试验产量", "品种"].forEach((gap) => {
+      if (includesGap(dataGaps, gap)) {
+        evidence_check.push(`已记录数据缺口：${gap}。`);
+      }
+    });
+
+    if (!evidence_check.length) {
+      evidence_check.push("未记录关键数据缺口，需确认是否已有真实土壤、逐日气象、本地试验和品种参数。");
+      redFlags.add("数据缺口记录不足");
+    }
+
+    const overall_risk_level = existing.overall_risk_level || deriveRiskLevel(redFlags, dataGaps);
+    return {
+      unit_check,
+      date_window_check,
+      gdd_check,
+      phenology_consistency_check,
+      water_balance_check,
+      nitrogen_budget_check,
+      fertilizer_schedule_check,
+      risk_check,
+      evidence_check,
+      data_gaps: Array.from(dataGaps),
+      red_flags: Array.from(redFlags),
+      overall_risk_level,
+      human_review_required: true
+    };
+  }
+
+  function buildGpt55ReviewPrompt({ sample, crop, region, managementPlan, localValidationResult, schema }) {
+    const dataGaps = localValidationResult?.data_gaps || sample?.gpt55_review_contract?.data_gaps || [];
+    const dndcInput = {
+      start_date: sample?.start_date,
+      input_summary: sample?.input_summary,
+      status: sample?.status || "not_reviewed"
+    };
+
+    return `你是一个谨慎的作物模型与农艺方案评审专家。你的任务不是重新生成种植方案，而是评估 DNDC-lite 输出是否可用，并提出风险复核和 JSON patch 建议。
+
+请注意：
+
+1. DNDC-lite 不是完整 DNDC。
+2. DNDC-lite 当前没有经过充分本地校准。
+3. GPT-5.5 不能替代确定性农学模型。
+4. 你不能默认 DNDC-lite 正确。
+5. 你也不能直接用自己的经验覆盖 DNDC-lite。
+6. 你需要逐模块评审：物候、GDD、水平衡、氮素预算、施肥日历、灌溉日历、产量预测、风险提示。
+7. 你需要判断哪些模块可保留，哪些模块需要修改，哪些模块必须丢弃。
+8. 如果你认为需要修改，请输出 JSON patch suggestions，而不是直接输出整篇方案。
+9. 如果缺少真实土壤检测、逐日气象、本地试验产量或品种参数，请降低 confidence。
+10. 不允许承诺保底增产。
+11. 输出必须是严格 JSON，不要输出 Markdown。
+
+输入数据：
+- 作物：
+${stableJson(crop || { id: sample?.crop_id })}
+- 区域：
+${stableJson(region || { id: sample?.region_id })}
+- 管理方案：
+${stableJson(managementPlan || null)}
+- DNDC-lite 输入：
+${stableJson(dndcInput)}
+- DNDC-lite 输出：
+${stableJson(sample?.dndc_lite_output || {})}
+- 本地规则检查结果：
+${stableJson(localValidationResult || {})}
+- 数据缺口：
+${stableJson(dataGaps)}
+
+请按照 gpt55-review-schema.json 的 output_schema 输出：
+${stableJson(schema?.output_schema || {})}`;
+  }
+
+  function decideModelMode(localValidationResult, gpt55ReviewOutput) {
+    const local = localValidationResult || {};
+    const review = normalizeReviewOutput(gpt55ReviewOutput);
+    const redFlags = local.red_flags || [];
+    const dataGaps = unique([...(local.data_gaps || []), ...((review && review.data_gaps) || [])]);
+    const scores = getModuleScores(review);
+    const keyAverage = average(Object.values(scores));
+    const severeDataMissing = hasAllSevereGaps(dataGaps);
+    const severeLocalFlags = redFlags.length >= 2 || local.overall_risk_level === "high";
+    const judgement = review?.overall_judgement || "needs_expert_review";
+    let recommended_mode = review?.recommended_mode || "hybrid";
+    let notes = "";
+
+    if (severeLocalFlags && severeDataMissing) {
+      recommended_mode = "manual_expert_only";
+      notes = "本地检查出现严重 red_flags，且缺少真实土壤检测、逐日气象和本地试验产量，必须专家确认。";
+    } else if (!redFlags.length && judgement === "usable" && keyAverage >= 80) {
+      recommended_mode = "dndc_primary_gpt_review";
+      notes = "本地规则未发现红旗，GPT 评审主要模块均分达到 80 以上，DNDC-lite 可作为主模型，GPT 只做审核。";
+    } else if (scores.phenology >= 70 && scores.gdd >= 70 && scores.nitrogen_budget >= 70 && (scores.yield_prediction < 70 || scores.water_balance < 70 || scores.irrigation_schedule < 70)) {
+      recommended_mode = "hybrid";
+      notes = "日期、GDD、物候或氮素结构相对可用，但水分、灌溉或产量预测需要 GPT 草案和人工复核。";
+    } else if (countBelow(scores, 60) >= 4 && !severeDataMissing) {
+      recommended_mode = "gpt_direct_draft";
+      notes = "DNDC-lite 多数关键模块低于 60，但基础数据并非完全缺失，GPT 只能生成 pending_review 草案。";
+    }
+
+    const nitrogenUsable = scores.nitrogen_budget >= 70 || (recommended_mode !== "manual_expert_only" && local.overall_risk_level !== "high");
+    if (scores.nitrogen_budget >= 70 && judgement !== "usable") {
+      notes = `${notes ? `${notes} ` : ""}DNDC-lite 整体不一定可用，但需肥规律、氮素需求随物候变化的结构可作为参考。`;
+    }
+
+    const canUseDates = recommended_mode !== "manual_expert_only" && scores.phenology >= 60 && scores.gdd >= 60 && !redFlags.some((flag) => hasText(flag, "播栽窗口") || hasText(flag, "积温"));
+    const canUseDndc = ["dndc_primary_gpt_review", "hybrid"].includes(recommended_mode);
+    const discard_modules = [];
+    if (!canUseDates) discard_modules.push("date_or_phenology_as_execution_plan");
+    if (scores.water_balance < 70) discard_modules.push("water_balance_without_local_weather");
+    if (scores.yield_prediction < 80 || dataGaps.some((gap) => hasText(gap, "试验产量"))) discard_modules.push("high_confidence_yield_prediction");
+    if (recommended_mode === "manual_expert_only") discard_modules.push("operation_calendar_as_execution_plan");
+
+    const reuse_modules = [];
+    if (canUseDates) reuse_modules.push("dates", "gdd", "phenology");
+    if (nitrogenUsable) reuse_modules.push("nitrogen_budget_structure", "nutrient_demand_curve");
+    if (scores.fertilizer_schedule >= 70 && recommended_mode !== "manual_expert_only") reuse_modules.push("fertilizer_event_framework");
+
+    return {
+      recommended_mode,
+      can_use_dndc_lite: canUseDndc,
+      can_use_dndc_lite_for_dates: canUseDates,
+      can_use_dndc_lite_for_gdd: scores.gdd >= 60 && recommended_mode !== "manual_expert_only",
+      can_use_dndc_lite_for_water_balance: scores.water_balance >= 70 && recommended_mode !== "manual_expert_only",
+      can_use_dndc_lite_for_nitrogen_budget: nitrogenUsable,
+      can_use_dndc_lite_for_fertilizer_schedule: scores.fertilizer_schedule >= 70 && recommended_mode !== "manual_expert_only",
+      can_use_dndc_lite_for_yield_prediction: false,
+      reuse_modules,
+      discard_modules: unique(discard_modules),
+      required_human_checks: unique([...dataGaps, ...redFlags]),
+      notes: notes || "GPT 输出仍为 pending_review；所有 JSON patch 必须人工确认后才能合并。"
+    };
+  }
+
+  function normalizeReviewOutput(value) {
+    if (!value) return null;
+    if (typeof value === "string") {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    return value;
+  }
+
+  function getModuleScores(review) {
+    const modules = review?.module_reviews || {};
+    const fallback = review ? 50 : 70;
+    return {
+      phenology: numberOrDefault(modules.phenology?.score, fallback),
+      gdd: numberOrDefault(modules.gdd?.score, fallback),
+      water_balance: numberOrDefault(modules.water_balance?.score, fallback),
+      nitrogen_budget: numberOrDefault(modules.nitrogen_budget?.score, fallback),
+      fertilizer_schedule: numberOrDefault(modules.fertilizer_schedule?.score, fallback),
+      irrigation_schedule: numberOrDefault(modules.irrigation_schedule?.score, fallback),
+      yield_prediction: numberOrDefault(modules.yield_prediction?.score, 40)
+    };
+  }
+
+  function isLegalDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  }
+
+  function numberOrZero(value) {
+    return Number.isFinite(Number(value)) ? Number(value) : 0;
+  }
+
+  function numberOrDefault(value, fallback) {
+    return Number.isFinite(Number(value)) ? Number(value) : fallback;
+  }
+
+  function hasText(value, text) {
+    return String(value || "").toLowerCase().includes(String(text || "").toLowerCase());
+  }
+
+  function includesGap(gaps, text) {
+    return Array.from(gaps || []).some((gap) => hasText(gap, text));
+  }
+
+  function deriveRiskLevel(redFlags, dataGaps) {
+    if (redFlags.size >= 2 || includesGap(dataGaps, "真实土壤检测") && includesGap(dataGaps, "逐日气象")) return "high";
+    if (redFlags.size >= 1 || Array.from(dataGaps).length >= 2) return "medium";
+    return "low";
+  }
+
+  function hasAllSevereGaps(dataGaps) {
+    return ["真实土壤", "逐日气象", "本地试验产量"].every((gap) => includesGap(dataGaps, gap));
+  }
+
+  function average(values) {
+    const safe = values.filter((value) => Number.isFinite(value));
+    return safe.length ? safe.reduce((total, value) => total + value, 0) / safe.length : 0;
+  }
+
+  function countBelow(scores, threshold) {
+    return Object.values(scores).filter((score) => score < threshold).length;
+  }
+
+  function unique(items) {
+    return Array.from(new Set((items || []).filter(Boolean)));
+  }
+
+  function stableJson(value) {
+    return JSON.stringify(value, null, 2);
+  }
+
   function round1(value) {
     return Math.round(value * 10) / 10;
   }
@@ -578,6 +922,9 @@
     simulatePhenology,
     buildManagementCalendar,
     estimateYield,
+    localValidationChecklist,
+    buildGpt55ReviewPrompt,
+    decideModelMode,
     dailyClimate,
     formatDate,
     parseLocalDate

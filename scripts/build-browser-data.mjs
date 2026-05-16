@@ -7,7 +7,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const builds = [
   ["../data/crop-growth-db.json", "../data/crop-growth-db.js", "CROP_GROWTH_DB"],
   ["../data/agro-region-db.json", "../data/agro-region-db.js", "AGRO_REGION_DB"],
-  ["../data/management-plan-db.json", "../data/management-plan-db.js", "MANAGEMENT_PLAN_DB"]
+  ["../data/management-plan-db.json", "../data/management-plan-db.js", "MANAGEMENT_PLAN_DB"],
+  ["../data/model-evaluation-samples.json", "../data/model-evaluation-samples.js", "MODEL_EVALUATION_SAMPLES"],
+  ["../data/gpt55-review-schema.json", "../data/gpt55-review-schema.js", "GPT55_REVIEW_SCHEMA"]
 ];
 
 for (const [jsonRel, jsRel, globalName] of builds) {

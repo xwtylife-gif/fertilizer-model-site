@@ -64,6 +64,28 @@ h4 {
   backdrop-filter: blur(12px);
 }
 
+.topnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.topnav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.72);
+}
+
 .eyebrow {
   color: var(--green);
   font-size: 12px;
@@ -148,7 +170,8 @@ label {
 }
 
 select,
-input {
+input,
+textarea {
   width: 100%;
   min-height: 40px;
   padding: 0 10px;
@@ -157,6 +180,12 @@ input {
   background: #fff;
   color: var(--ink);
   font: inherit;
+}
+
+textarea {
+  min-height: 220px;
+  padding: 12px;
+  resize: vertical;
 }
 
 .planner-output {
@@ -331,6 +360,212 @@ dd {
   font-weight: 700;
 }
 
+.evaluation-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.role-card,
+.detail-block,
+.mode-guide div,
+.decision-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.role-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.role-card span,
+.mode-guide span,
+.parse-message {
+  color: var(--muted);
+}
+
+.role-card ul,
+.checklist ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.mode-guide {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mode-guide div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.mode-guide strong {
+  color: var(--blue);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.evaluation-table table {
+  min-width: 1120px;
+}
+
+.active-row {
+  background: #f3f9f4;
+}
+
+.link-button,
+.small-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--blue);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.link-button {
+  padding: 6px 9px;
+}
+
+.small-button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.small-button.primary {
+  border-color: #a9d7ba;
+  color: #0d5e32;
+  background: #effaf2;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.risk-low {
+  color: #0d5e32;
+  background: #dff2e6;
+}
+
+.risk-medium {
+  color: #87530e;
+  background: #fff1d0;
+}
+
+.risk-high {
+  color: var(--red);
+  background: #ffe5db;
+}
+
+.evaluation-detail {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-head,
+.inline-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-grid.wide-left {
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+}
+
+.detail-block {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+pre {
+  max-height: 460px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #26342b;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prompt-box {
+  min-height: 260px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.checklist {
+  display: grid;
+  gap: 12px;
+}
+
+.checklist div {
+  display: grid;
+  gap: 6px;
+}
+
+.red-flags {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.decision-box {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.decision-box > p:last-child {
+  color: var(--muted);
+}
+
+.module-lists {
+  display: grid;
+  gap: 10px;
+}
+
+.module-lists p {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.parse-message {
+  font-size: 13px;
+}
+
 .calendar-section {
   display: grid;
   gap: 10px;
@@ -433,7 +668,11 @@ dd {
 @media (max-width: 1040px) {
   .planner-head,
   .split-layout,
-  .result-grid {
+  .result-grid,
+  .role-grid,
+  .mode-guide,
+  .detail-grid,
+  .detail-grid.wide-left {
     grid-template-columns: 1fr;
   }
 
@@ -446,14 +685,23 @@ dd {
   .topbar,
   .section-head,
   .crop-title,
-  .calendar-item {
+  .calendar-item,
+  .detail-head,
+  .inline-head {
     align-items: flex-start;
   }
 
   .topbar,
   .section-head,
-  .crop-title {
+  .crop-title,
+  .detail-head,
+  .inline-head {
     flex-direction: column;
+  }
+
+  .topnav {
+    justify-content: flex-start;
+    margin-left: 0;
   }
 
   .controls,
@@ -461,7 +709,8 @@ dd {
   .calendar-item,
   .calendar-body dl,
   dl,
-  .opt-box dl {
+  .opt-box dl,
+  .decision-box dl {
     grid-template-columns: 1fr;
   }
 

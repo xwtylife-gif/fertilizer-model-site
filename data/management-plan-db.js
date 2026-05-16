@@ -92,6 +92,8 @@ window.MANAGEMENT_PLAN_DB = {
         "endpoint": "Responses API",
         "reasoningEffort": "high",
         "role": "agronomic_plan_auditor",
+        "defaultReviewStatus": "pending_review",
+        "patchPolicy": "JSON patch suggestions only; never auto-apply without human confirmation.",
         "strategy": "Deterministic DNDC-lite engine produces dates and nutrient budgets first; GPT-5.5 audits local risks, rewrites novice-readable instructions, and returns structured JSON patches. It must not invent unregistered pesticide products.",
         "inputContract": [
           "crop record",
@@ -117,7 +119,8 @@ window.MANAGEMENT_PLAN_DB = {
           "Do not change thermal-stage dates unless a weather dataset is supplied.",
           "Do not name a pesticide product unless the local label/registration is supplied.",
           "Prefer monitoring threshold and local plant protection station confirmation for chemical control.",
-          "Keep every instruction executable by a novice with date, field condition, amount, and stop condition."
+          "Keep every instruction executable by a novice with date, field condition, amount, and stop condition.",
+          "All GPT output must remain pending_review until a human reviewer accepts it."
         ]
       },
       "nutrientBudgetKgMu": {

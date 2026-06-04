@@ -379,7 +379,7 @@ button.ghost {
 
 table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1220px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -477,6 +477,21 @@ td.truncate {
   color: #475467;
   background: #f2f4f7;
   border: 1px solid var(--border);
+}
+
+.direction-service {
+  color: #155eef;
+  background: #eff6ff;
+  border: 1px solid #bfd7ff;
+}
+
+.direction-raw {
+  color: #ffffff;
+  background: #7c3aed;
+}
+
+.direction-cell {
+  min-width: 134px;
 }
 
 .detail-cell {
@@ -708,15 +723,16 @@ td.truncate {
   .customer-row td:nth-child(2),
   .customer-row td:nth-child(3),
   .customer-row td:nth-child(5),
-  .customer-row td:nth-child(9),
-  .customer-row td:nth-child(10) {
+  .customer-row td:nth-child(6),
+  .customer-row td:nth-child(10),
+  .customer-row td:nth-child(11) {
     display: flex;
     align-items: center;
     gap: 5px;
     color: var(--text-soft);
   }
 
-  .customer-row td:nth-child(11) {
+  .customer-row td:nth-child(12) {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -736,9 +752,14 @@ td.truncate {
     content: "类别";
   }
 
+  .customer-row td:nth-child(6)::before {
+    content: "方向";
+  }
+
   .customer-row td:nth-child(2)::before,
   .customer-row td:nth-child(3)::before,
-  .customer-row td:nth-child(5)::before {
+  .customer-row td:nth-child(5)::before,
+  .customer-row td:nth-child(6)::before {
     color: var(--muted);
     font-weight: 800;
   }

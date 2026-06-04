@@ -39,6 +39,10 @@
             <select id="category"></select>
           </div>
           <div class="row">
+            <label>客户方向</label>
+            <select id="customerDirection"></select>
+          </div>
+          <div class="row">
             <label>省份</label>
             <select id="province"></select>
           </div>
@@ -97,6 +101,11 @@
           </div>
 
           <div class="board-section">
+            <h3>按客户方向统计</h3>
+            <div id="directionBoard" class="board-list"></div>
+          </div>
+
+          <div class="board-section">
             <h3>按省份统计</h3>
             <div id="provinceBoard" class="board-list"></div>
           </div>
@@ -115,8 +124,9 @@
               <th>地级市</th>
               <th>公司主体</th>
               <th>客户大类</th>
+              <th>客户方向</th>
               <th>主要作物/产品</th>
-              <th>农田面积</th>
+              <th>面积/规模</th>
               <th>土地级别</th>
               <th>优先级</th>
               <th>合作状态</th>

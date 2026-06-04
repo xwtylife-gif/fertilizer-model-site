@@ -9,7 +9,9 @@ const EDIT_STORE_KEY = "targetCustomerEdits_v1";
 const DETAILS_EXPAND_KEY = "targetCustomerDetailExpanded_v1";
 const DEFAULT_COOP_STATUS = "未合作";
 const DATA_MODE_KEY = "targetCustomerDataMode_v1";
-const TABLE_COLUMN_COUNT = 11;
+const TABLE_COLUMN_COUNT = 12;
+const SERVICE_CUSTOMER_DIRECTION = "服务目标客户（提供服务/项目）";
+const RAW_MATERIAL_CUSTOMER_DIRECTION = "原料产品客户（提供原料）";
 const EDIT_PRIORITY_OPTIONS = [
   "S-立即拜访",
   "A-优先拜访",
@@ -49,6 +51,7 @@ const els = {
   keyword: document.getElementById("keyword"),
   priority: document.getElementById("priority"),
   category: document.getElementById("category"),
+  customerDirection: document.getElementById("customerDirection"),
   province: document.getElementById("province"),
   city: document.getElementById("city"),
   econScale: document.getElementById("econScale"),
@@ -62,6 +65,7 @@ const els = {
   summary: document.getElementById("summary"),
   metricCards: document.getElementById("metricCards"),
   categoryBoard: document.getElementById("categoryBoard"),
+  directionBoard: document.getElementById("directionBoard"),
   provinceBoard: document.getElementById("provinceBoard"),
   scaleBoard: document.getElementById("scaleBoard"),
   resetBtn: document.getElementById("resetBtn"),
@@ -85,6 +89,19 @@ function normalizeCoopStatus(value) {
   if (/已合作|合作中|合作成功|签约|已签/.test(s)) return "已合作";
   if (/未合作|未签|无合作/.test(s)) return "未合作";
   return s;
+}
+
+function normalizeCustomerDirection(value, category = "") {
+  const direct = toText(value);
+  if (direct) {
+    if (/原料|产品|肥料|母液|CPW|生物刺激素/.test(direct)) return RAW_MATERIAL_CUSTOMER_DIRECTION;
+    if (/服务|项目|处理|补给站/.test(direct)) return SERVICE_CUSTOMER_DIRECTION;
+    return direct;
+  }
+
+  const cat = toText(category);
+  if (/肥料企业|特肥|生物刺激素|原料客户/.test(cat)) return RAW_MATERIAL_CUSTOMER_DIRECTION;
+  return SERVICE_CUSTOMER_DIRECTION;
 }
 
 function loadEditStore() {
@@ -367,6 +384,7 @@ function normalizeRow(raw, fallbackProvinceSeq = 0, source = DEFAULT_SOURCE_NAME
   const province = toText(raw["省份"]) || "未知省份";
   const city = toText(raw["地级市"]) || toText(raw["地级市/区域"]) || "未知城市";
   const name = toText(raw["公司主体"] || raw["公司/基地主体"] || raw["公司名称"] || raw["企业名称"] || raw["公司"] || raw["线索名称"] || "");
+  const category = toText(raw["目标用户大类"] || raw["分类"] || "");
   const areaLevelText = toText(raw["土地级别"] || "");
   const scaleText = toText(raw["经济规模"] || "");
   const sourceRowUid = toText(
@@ -381,8 +399,9 @@ function normalizeRow(raw, fallbackProvinceSeq = 0, source = DEFAULT_SOURCE_NAME
   const normalized = {
     序号: toText(raw["序号"]) || String(fallbackProvinceSeq),
     公司主体: name,
-    目标用户大类: toText(raw["目标用户大类"] || raw["分类"] || ""),
+    目标用户大类: category,
     分类: toText(raw["分类"] || raw["目标用户大类"] || ""),
+    客户方向: normalizeCustomerDirection(raw["客户方向"] || raw["业务类型"] || raw["业务方向"] || raw["客户类型"], category),
     省份: province,
     地级市: city,
     区县: toText(raw["区县"]) || toText(raw["区县/基地"]),
@@ -507,6 +526,7 @@ function buildCityOptions(selectedProvince) {
 function initFilters() {
   buildOptions(els.priority, uniq(currentRows.map((i) => i.优先级)));
   buildOptions(els.category, uniq(currentRows.map((i) => i.目标用户大类)));
+  buildOptions(els.customerDirection, uniq(currentRows.map((i) => i.客户方向)));
   buildOptions(els.province, uniq(currentRows.map((i) => i.省份)));
   buildCityOptions(ALL_TEXT);
   buildOptions(els.econScale, uniq(currentRows.map((i) => i.经济规模)));
@@ -534,9 +554,15 @@ function updateSummary() {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
+  const directionCounts = currentRows.reduce((acc, item) => {
+    const key = item.客户方向 || SERVICE_CUSTOMER_DIRECTION;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
   const defaultPriorityOrder = ["S-立即拜访", "A-优先拜访", "B-重点观察", "B-备选拜访", "C-待评估", "C-储备/尽调"];
   els.summary.textContent = `当前库：${currentSourceName}（${modeText}），共 ${currentRows.length} 家候选；已提取面积口径 ${totalWithArea} 家；` +
+    `客户方向：服务 ${directionCounts[SERVICE_CUSTOMER_DIRECTION] || 0}，原料产品 ${directionCounts[RAW_MATERIAL_CUSTOMER_DIRECTION] || 0}。` +
     `高潜 ${scaleSummary["小型高潜"] || 0}，中型 ${scaleSummary["中型"] || 0}，大规模 ${scaleSummary["中型偏大"] || 0}/${scaleSummary["大型"] || 0}，未核验 ${scaleSummary["待核验"] || 0}。` +
     `合作状态：已合作 ${coopCounts["已合作"] || 0}，未合作 ${coopCounts["未合作"] || 0}。` +
     `优先级：` + defaultPriorityOrder.map((k) => `${k}:${priorityCounts[k] || 0}`).join("，");
@@ -636,6 +662,7 @@ function updateOverviewBoards(filteredRows) {
   const totalPriority = saas + aVisit;
   const pendingCoop = rows.filter((item) => (item.是否合作 || DEFAULT_COOP_STATUS) === "待确认").length;
   const disclosedArea = rows.filter((item) => toText(item.农田面积) && item.农田面积 !== "公开未披露").length;
+  const rawMaterialCount = rows.filter((item) => item.客户方向 === RAW_MATERIAL_CUSTOMER_DIRECTION).length;
 
   if (!els.metricCards) return;
   els.metricCards.innerHTML = "";
@@ -643,6 +670,7 @@ function updateOverviewBoards(filteredRows) {
     renderMetricCard("筛选后总量", total + " 家"),
     renderMetricCard("有可核验农田", areaCount + " 家"),
     renderMetricCard("S/A级潜在重点", totalPriority + " 家"),
+    renderMetricCard("原料产品客户", rawMaterialCount + " 家"),
     renderMetricCard("已合作", totalCoop + " 家"),
     renderMetricCard("待确认合作", pendingCoop + " 家"),
     renderMetricCard("已披露面积", disclosedArea + " 家")
@@ -651,6 +679,10 @@ function updateOverviewBoards(filteredRows) {
   if (els.categoryBoard) {
     els.categoryBoard.innerHTML = "";
     renderDistributionBoard(els.categoryBoard, rows, "目标用户大类");
+  }
+  if (els.directionBoard) {
+    els.directionBoard.innerHTML = "";
+    renderDistributionBoard(els.directionBoard, rows, "客户方向");
   }
   if (els.provinceBoard) {
     els.provinceBoard.innerHTML = "";
@@ -670,6 +702,7 @@ function matchText(item, keyword) {
     item.省份,
     item.地级市,
     item.目标用户大类,
+    item.客户方向,
     item.推荐路线,
     item.典型废弃物,
     item.是否合作,
@@ -683,11 +716,12 @@ function buildBriefIntro(item) {
   const parts = [];
   const area = [item.省份, item.地级市].filter(Boolean).join(" / ");
   if (area) parts.push(`区域：${area}`);
+  if (item.客户方向) parts.push(`客户方向：${item.客户方向}`);
   if (item.客户角色) parts.push(`角色：${item.客户角色}`);
   if (item.自有农田) parts.push(`自有农田：${item.自有农田}`);
   if (item.主要作物) parts.push(`作物：${item.主要作物}`);
   if (item.农田面积) parts.push(`面积：${item.农田面积}`);
-  if (item.典型废弃物) parts.push(`废弃物：${item.典型废弃物}`);
+  if (item.典型废弃物) parts.push(`${item.客户方向 === RAW_MATERIAL_CUSTOMER_DIRECTION ? "原料需求" : "废弃物"}：${item.典型废弃物}`);
   if (item.推荐路线) parts.push(`切入路线：${item.推荐路线}`);
   if (item.拜访建议) parts.push(`建议：${item.拜访建议}`);
   if (item.尽调问题) parts.push(`尽调：${item.尽调问题}`);
@@ -740,20 +774,21 @@ function createDetailPanel(item, noteKey) {
   const sectionA = document.createElement("div");
   sectionA.className = "detail-section";
   sectionA.appendChild(createDetailLine("基本情况", item.基本情况介绍 || buildBriefIntro(item), true));
+  sectionA.appendChild(createDetailLine("客户方向", item.客户方向));
   sectionA.appendChild(createDetailLine("主要作物", item.主要作物));
   sectionA.appendChild(createDetailLine("自有农田", item.自有农田));
   sectionA.appendChild(createDetailLine("土地级别", item.土地级别 || item.经济规模 || "待核验"));
 
   const sectionB = document.createElement("div");
   sectionB.className = "detail-section";
-  sectionB.appendChild(createDetailLine("典型废弃物", item.典型废弃物));
+  sectionB.appendChild(createDetailLine(item.客户方向 === RAW_MATERIAL_CUSTOMER_DIRECTION ? "原料需求" : "典型废弃物", item.典型废弃物));
   sectionB.appendChild(createDetailLine("推荐路线", item.推荐路线));
   sectionB.appendChild(createDetailLine("拜访建议", item.拜访建议, true));
   sectionB.appendChild(createDetailLine("尽调问题", item.尽调问题, true));
 
   const sectionC = document.createElement("div");
   sectionC.className = "detail-section";
-  sectionC.appendChild(createDetailLine("可核验面积", item.农田面积));
+  sectionC.appendChild(createDetailLine(item.客户方向 === RAW_MATERIAL_CUSTOMER_DIRECTION ? "规模口径" : "可核验面积", item.农田面积));
 
   const sourceLinkHost = createSourceLink(item.网址);
   const sourceRow = document.createElement("p");
@@ -849,6 +884,10 @@ function getCoopBadgeType(status) {
   return "coop-none";
 }
 
+function getDirectionBadgeType(direction) {
+  return direction === RAW_MATERIAL_CUSTOMER_DIRECTION ? "direction-raw" : "direction-service";
+}
+
 function setDetailToggleButton(button, isExpanded) {
   if (!button) return;
   button.classList.toggle("is-open", isExpanded);
@@ -928,6 +967,7 @@ function renderRows(filtered) {
       <td>${escapeHtml(item.地级市)}</td>
       <td class="company-cell">${escapeHtml(item.公司主体)}</td>
       <td>${escapeHtml(item.目标用户大类)}</td>
+      <td class="direction-cell"></td>
       <td class="truncate">${escapeHtml(item.主要作物)}</td>
       <td>${escapeHtml(item.农田面积)}</td>
       <td>${escapeHtml(item.土地级别)}</td>
@@ -935,6 +975,9 @@ function renderRows(filtered) {
       <td class="cooperation-cell"></td>
       <td class="detail-cell"></td>
     `;
+
+    const directionCell = tr.querySelector(".direction-cell");
+    directionCell.appendChild(createBadge(item.客户方向 || SERVICE_CUSTOMER_DIRECTION, getDirectionBadgeType(item.客户方向)));
 
     const priorityCell = tr.querySelector(".priority-cell");
     if (isEditMode) {
@@ -1097,6 +1140,7 @@ function applyFilters() {
   const cond = {
     priority: els.priority.value,
     category: els.category.value,
+    customerDirection: els.customerDirection.value,
     province: els.province.value,
     city: els.city.value,
     econScale: els.econScale.value,
@@ -1108,6 +1152,7 @@ function applyFilters() {
   const filtered = currentRows.filter((item) => {
     if (cond.priority !== ALL_TEXT && item.优先级 !== cond.priority) return false;
     if (cond.category !== ALL_TEXT && item.目标用户大类 !== cond.category) return false;
+    if (cond.customerDirection !== ALL_TEXT && (item.客户方向 || SERVICE_CUSTOMER_DIRECTION) !== cond.customerDirection) return false;
     if (cond.province !== ALL_TEXT && item.省份 !== cond.province) return false;
     if (cond.city !== ALL_TEXT && item.地级市 !== cond.city) return false;
     if (cond.econScale !== ALL_TEXT && item.经济规模 !== cond.econScale) return false;
@@ -1137,6 +1182,7 @@ function setCurrentRows(rows, sourceName, keepFilters = false, mode = currentSou
     els.keyword.value = "";
     els.priority.value = ALL_TEXT;
     els.category.value = ALL_TEXT;
+    els.customerDirection.value = ALL_TEXT;
     els.province.value = ALL_TEXT;
     buildCityOptions(ALL_TEXT);
     els.city.value = ALL_TEXT;
@@ -1299,6 +1345,7 @@ function exportRowsToCsv(rows, filename) {
     item.地级市 || "",
     item.公司主体 || "",
     item.目标用户大类 || "",
+    item.客户方向 || SERVICE_CUSTOMER_DIRECTION,
     item.主要作物 || "",
     item.自有农田 || "",
     item.农田面积 || "",
@@ -1313,10 +1360,10 @@ function exportRowsToCsv(rows, filename) {
   ]);
 
   const lines = [
-    "序号,省份,地级市,公司主体,目标用户大类,主要作物,自有农田,农田面积,土地级别,经济规模,优先级,总分,典型废弃物,是否合作,基本情况介绍,备注",
+    "序号,省份,地级市,公司主体,目标用户大类,客户方向,主要作物,自有农田,农田面积,土地级别,经济规模,优先级,总分,典型废弃物,是否合作,基本情况介绍,备注",
   ];
   dataRows.forEach((row) => {
-    const vals = row.length >= 16 ? row.slice(0, 16) : [...row, ...Array(16 - row.length).fill("")];
+    const vals = row.length >= 17 ? row.slice(0, 17) : [...row, ...Array(17 - row.length).fill("")];
     const escaped = vals.map((v) => `"${(v || "").replace(/"/g, '""')}"`);
     lines.push(escaped.join(","));
   });
@@ -1333,6 +1380,7 @@ function bindEvents() {
   els.keyword.addEventListener("input", applyFilters);
   els.priority.addEventListener("change", applyFilters);
   els.category.addEventListener("change", applyFilters);
+  els.customerDirection.addEventListener("change", applyFilters);
   els.province.addEventListener("change", () => {
     buildCityOptions(els.province.value || ALL_TEXT);
     applyFilters();

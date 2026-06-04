@@ -27,10 +27,6 @@
 
         <div class="grid-2">
           <div class="row">
-            <label>数据口径</label>
-            <select id="dataMode"></select>
-          </div>
-          <div class="row">
             <label>优先级</label>
             <select id="priority"></select>
           </div>
@@ -83,7 +79,7 @@
           <input id="importFile" type="file" accept=".csv,.json,.xlsx,.xls" />
           <button id="restoreBtn" type="button" class="ghost"><span data-lucide="archive-restore"></span>恢复官方清单</button>
         </div>
-        <div id="importStatus" class="hint">当前使用：官方综合/补充清单（278条）</div>
+        <div id="importStatus" class="hint">当前使用：主体库加载中...</div>
         <p class="hint">说明：若“农田面积级别/经济规模”为“面积需核验/待核验”，建议先做尽调再定级。</p>
       </aside>
 
@@ -141,7 +137,6 @@
   </div>
 
   <script src="./data.js"></script>
-  <script src="./customer_raw_data.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="./app.js"></script>

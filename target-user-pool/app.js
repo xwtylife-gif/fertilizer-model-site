@@ -1,5 +1,4 @@
 const BASE_SOURCE = Array.isArray(window.CUSTOMER_DATA) ? window.CUSTOMER_DATA : [];
-const BASE_RAW_SOURCE = Array.isArray(window.CUSTOMER_RAW_DATA) ? window.CUSTOMER_RAW_DATA : [];
 
 const DEFAULT_SOURCE_NAME = "官方综合清单（含中小补充）";
 const ALL_TEXT = "全部";
@@ -8,7 +7,6 @@ const EDIT_PASSWORD = "123456789Dxy";
 const EDIT_STORE_KEY = "targetCustomerEdits_v1";
 const DETAILS_EXPAND_KEY = "targetCustomerDetailExpanded_v1";
 const DEFAULT_COOP_STATUS = "未合作";
-const DATA_MODE_KEY = "targetCustomerDataMode_v1";
 const TABLE_COLUMN_COUNT = 12;
 const SERVICE_CUSTOMER_DIRECTION = "服务目标客户（提供服务/项目）";
 const RAW_MATERIAL_CUSTOMER_DIRECTION = "原料产品客户（提供原料）";
@@ -22,29 +20,20 @@ const EDIT_PRIORITY_OPTIONS = [
 ];
 const EDIT_COOP_OPTIONS = ["未合作", "已合作", "待确认"];
 
-const DATA_MODES = {
-  dedupe: {
-    value: "dedupe",
-    label: "按主体（去重）",
-    name: DEFAULT_SOURCE_NAME,
-    rows: BASE_SOURCE,
-    dedupe: true,
-  },
-  raw: {
-    value: "raw",
-    label: "按线索明细（原始行）",
-    name: "继续新增2倍高价值主体版（线索明细）",
-    rows: BASE_RAW_SOURCE,
-    dedupe: false,
-  },
+const SUBJECT_SOURCE = {
+  value: "dedupe",
+  label: "按主体（去重）",
+  name: DEFAULT_SOURCE_NAME,
+  rows: BASE_SOURCE,
+  dedupe: true,
 };
 
-function getDataModeConfig(mode) {
-  return DATA_MODES[mode] || DATA_MODES.dedupe;
+function getDataModeConfig() {
+  return SUBJECT_SOURCE;
 }
 
 let currentSourceName = DEFAULT_SOURCE_NAME;
-let currentSourceMode = "dedupe";
+let currentSourceMode = SUBJECT_SOURCE.value;
 let currentRows = [];
 
 const els = {
@@ -59,7 +48,6 @@ const els = {
   farmFlag: document.getElementById("farmFlag"),
   cooperation: document.getElementById("cooperation"),
   sortBy: document.getElementById("sortBy"),
-  dataMode: document.getElementById("dataMode"),
   rows: document.getElementById("rows"),
   resultCount: document.getElementById("resultCount"),
   summary: document.getElementById("summary"),
@@ -442,65 +430,10 @@ function dedupeRows(rows) {
   return Array.from(map.values());
 }
 
-function initDataModeSelector() {
-  if (!els.dataMode) return;
-  const options = [
-    { value: DATA_MODES.dedupe.value, label: DATA_MODES.dedupe.label },
-    { value: DATA_MODES.raw.value, label: DATA_MODES.raw.label },
-  ];
-  const mode = getStoredDataMode();
-
-  els.dataMode.innerHTML = "";
-  options.forEach((item) => {
-    const modeRows = DATA_MODES[item.value]?.rows || [];
-    const count = Array.isArray(modeRows) ? modeRows.length : 0;
-    const label = `${item.label}（${count}条）`;
-    const opt = new Option(label, item.value);
-    if (item.value === DATA_MODES.raw.value && (!Array.isArray(DATA_MODES.raw.rows) || DATA_MODES.raw.rows.length === 0)) {
-      opt.disabled = true;
-    }
-    els.dataMode.appendChild(opt);
-  });
-
-  const shouldUseRaw =
-    mode === DATA_MODES.raw.value &&
-    Array.isArray(DATA_MODES.raw.rows) &&
-    DATA_MODES.raw.rows.length > 0;
-  currentSourceMode = shouldUseRaw ? DATA_MODES.raw.value : DATA_MODES.dedupe.value;
-  els.dataMode.value = currentSourceMode;
-}
-
-function getStoredDataMode() {
-  try {
-    const raw = window.localStorage.getItem(DATA_MODE_KEY);
-    if (raw && DATA_MODES[raw]) return raw;
-  } catch (_) {
-    // ignore
-  }
-  return DATA_MODES.dedupe.value;
-}
-
-function saveDataMode(mode) {
-  try {
-    window.localStorage.setItem(DATA_MODE_KEY, mode);
-  } catch (_) {
-    // ignore
-  }
-}
-
-function buildSourceName(mode) {
-  const config = getDataModeConfig(mode);
+function buildSourceName() {
+  const config = getDataModeConfig();
   const allCount = Array.isArray(config.rows) ? config.rows.length : 0;
-  if (config.value === DATA_MODES.raw.value) {
-    const displayCount = config.dedupe ? config.rows.length : allCount;
-    return `${config.name}（原始${allCount}条 / 显示${displayCount}条）`;
-  }
-  return `${config.name}（${allCount}条）`;
-}
-
-function getNormalizedRowsByMode(mode) {
-  const config = getDataModeConfig(mode);
-  return normalizeRows(config.rows, config.name, config.dedupe);
+  return `${config.name}（${allCount}条主体）`;
 }
 
 function normalizeRows(rawRows, source = "导入清单", dedupe = true) {
@@ -538,7 +471,7 @@ function initFilters() {
 
 function updateSummary() {
   const totalWithArea = currentRows.filter((item) => Number.isFinite(item.公开面积亩)).length;
-  const modeText = getDataModeConfig(currentSourceMode).label || "数据口径";
+  const modeText = getDataModeConfig().label || "主体库";
   const priorityCounts = currentRows.reduce((acc, item) => {
     const key = item.优先级 || "未定义";
     acc[key] = (acc[key] || 0) + 1;
@@ -1120,21 +1053,6 @@ function toggleEditMode() {
   ensureEditMode();
 }
 
-function switchDataMode() {
-  const mode = toText(els.dataMode && els.dataMode.value) || DATA_MODES.dedupe.value;
-  const config = getDataModeConfig(mode);
-  if (!Array.isArray(config.rows) || !config.rows.length) {
-    window.alert("当前没有可用的线索明细数据，已切回去重主体视图。");
-    currentSourceMode = DATA_MODES.dedupe.value;
-    if (els.dataMode) els.dataMode.value = DATA_MODES.dedupe.value;
-    return;
-  }
-
-  saveDataMode(config.value);
-  const normalizedRows = getNormalizedRowsByMode(config.value);
-  setCurrentRows(normalizedRows, buildSourceName(config.value), false, config.value);
-}
-
 function applyFilters() {
   const keyword = toText(els.keyword.value).toLowerCase();
   const cond = {
@@ -1171,9 +1089,6 @@ function setCurrentRows(rows, sourceName, keepFilters = false, mode = currentSou
   currentRows = rows;
   currentSourceName = sourceName || "导入清单";
   currentSourceMode = mode;
-  if (els.dataMode) {
-    els.dataMode.value = currentSourceMode;
-  }
   els.importStatus.textContent = `当前使用：${currentSourceName}（${currentRows.length}条）`;
   initFilters();
   updateSummary();
@@ -1196,9 +1111,9 @@ function setCurrentRows(rows, sourceName, keepFilters = false, mode = currentSou
 }
 
 function resetFilters() {
-  const config = getDataModeConfig(currentSourceMode);
+  const config = getDataModeConfig();
   const rows = normalizeRows(config.rows, config.name, config.dedupe);
-  setCurrentRows(rows, buildSourceName(config.value), false, config.value);
+  setCurrentRows(rows, buildSourceName(), false, config.value);
 }
 
 function parseCsvContent(text) {
@@ -1307,7 +1222,7 @@ function importFromFile(file) {
         importedRaw = csvRowsToObjects(rows);
       }
 
-      const shouldDedupe = getDataModeConfig(currentSourceMode).dedupe;
+      const shouldDedupe = getDataModeConfig().dedupe;
       const merged = normalizeRows(importedRaw, `导入清单：${file.name}`, shouldDedupe);
       if (!merged.length) {
         els.importStatus.textContent = `导入失败：${file.name} 解析为空，请确认文件有标题行和数据行。`;
@@ -1391,9 +1306,6 @@ function bindEvents() {
   els.farmFlag.addEventListener("change", applyFilters);
   els.cooperation.addEventListener("change", applyFilters);
   els.sortBy.addEventListener("change", applyFilters);
-  if (els.dataMode) {
-    els.dataMode.addEventListener("change", switchDataMode);
-  }
   els.resetBtn.addEventListener("click", resetFilters);
   if (els.editModeBtn) {
     els.editModeBtn.addEventListener("click", toggleEditMode);
@@ -1404,9 +1316,9 @@ function bindEvents() {
   els.rows.addEventListener("click", toggleDetail);
   els.rows.addEventListener("change", handleRowEditorChange);
   els.restoreBtn.addEventListener("click", () => {
-    const config = getDataModeConfig(currentSourceMode);
+    const config = getDataModeConfig();
     const resetRows = normalizeRows(config.rows, config.name, config.dedupe);
-    setCurrentRows(resetRows, buildSourceName(config.value), false, config.value);
+    setCurrentRows(resetRows, buildSourceName(), false, config.value);
     els.importStatus.textContent = `已恢复：${config.name}`;
   });
   els.importFile.addEventListener("change", (e) => importFromFile(e.target.files[0]));
@@ -1416,9 +1328,8 @@ function boot() {
   noteStore = loadNoteStore();
   editStore = loadEditStore();
   detailExpandStore = loadDetailExpandState();
-  initDataModeSelector();
 
-  const baseMode = getDataModeConfig(currentSourceMode);
+  const baseMode = getDataModeConfig();
   const baseRows = normalizeRows(baseMode.rows, baseMode.name, baseMode.dedupe);
   if (!baseRows.length) {
     currentRows = [];
@@ -1428,7 +1339,7 @@ function boot() {
   }
   setEditModeButton();
   renderIcons();
-  setCurrentRows(baseRows, buildSourceName(baseMode.value), false, baseMode.value);
+  setCurrentRows(baseRows, buildSourceName(), false, baseMode.value);
   bindEvents();
 }
 

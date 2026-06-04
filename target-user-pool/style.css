@@ -255,18 +255,90 @@ thead th {
   z-index: 1;
 }
 
-tbody tr:nth-child(even) {
-  background: #f8fbff;
+.customer-row {
+  background: #ffffff;
+}
+
+.customer-row:hover {
+  background: #f2f7ff;
+}
+
+.detail-toggle {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 99px;
+}
+
+.detail-row td {
+  padding: 0;
+  border-top: 0;
+  background: #f7faff;
+}
+
+.detail-row[hidden] {
+  display: none;
+}
+
+.detail-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px dashed #d7e3f3;
+  background: #f7fbff;
+}
+
+.detail-section {
+  display: grid;
+  gap: 6px;
+}
+
+.detail-line {
+  margin: 0;
+  color: #334155;
+  line-height: 1.45;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.detail-line-value {
+  color: #1f2937;
+}
+
+.detail-line-label {
+  color: #64748b;
+  min-width: 84px;
+  font-weight: 600;
+}
+
+.detail-line a {
+  color: #1f67bb;
+  text-decoration: none;
+}
+
+.detail-line-value.multi {
+  white-space: normal;
+}
+
+.note-editor-wrap {
+  border: 1px solid #dce4f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+  max-width: 760px;
+}
+
+.note-title {
+  font-size: 0.84rem;
+  color: #475569;
+  margin-bottom: 6px;
+  font-weight: 600;
 }
 
 td.truncate {
   max-width: 240px;
   white-space: normal;
   line-height: 1.4;
-}
-
-.note-cell {
-  min-width: 220px;
 }
 
 .note-editor {

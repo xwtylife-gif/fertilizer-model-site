@@ -6,8 +6,10 @@ const ALL_TEXT = "全部";
 const NOTE_STORAGE_KEY = "targetCustomerNotes_v1";
 const EDIT_PASSWORD = "123456789Dxy";
 const EDIT_STORE_KEY = "targetCustomerEdits_v1";
+const DETAILS_EXPAND_KEY = "targetCustomerDetailExpanded_v1";
 const DEFAULT_COOP_STATUS = "未合作";
 const DATA_MODE_KEY = "targetCustomerDataMode_v1";
+const TABLE_COLUMN_COUNT = 11;
 const EDIT_PRIORITY_OPTIONS = [
   "S-立即拜访",
   "A-优先拜访",
@@ -74,6 +76,7 @@ const els = {
 let renderedRows = [];
 let noteStore = {};
 let editStore = {};
+let detailExpandStore = {};
 let isEditMode = false;
 
 function normalizeCoopStatus(value) {
@@ -195,6 +198,43 @@ function setNote(itemOrKey, noteText) {
     delete noteStore[key];
   }
   saveNoteStore();
+}
+
+function loadDetailExpandState() {
+  try {
+    const raw = window.localStorage.getItem(DETAILS_EXPAND_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed;
+  } catch (_) {
+    // ignore
+  }
+  return {};
+}
+
+function saveDetailExpandState() {
+  try {
+    window.localStorage.setItem(DETAILS_EXPAND_KEY, JSON.stringify(detailExpandStore));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function isDetailExpanded(itemOrKey) {
+  const key = resolveNoteKey(itemOrKey);
+  if (!key) return false;
+  return Boolean(detailExpandStore[key]);
+}
+
+function setDetailExpanded(itemOrKey, isExpanded) {
+  const key = resolveNoteKey(itemOrKey);
+  if (!key) return;
+  if (isExpanded) {
+    detailExpandStore[key] = true;
+  } else {
+    delete detailExpandStore[key];
+  }
+  saveDetailExpandState();
 }
 
 function parseNumeric(v) {
@@ -617,6 +657,106 @@ function buildBriefIntro(item) {
   return parts.join("；") || "待补充基本情况";
 }
 
+function toDisplayText(value, fallback = "") {
+  const text = toText(value);
+  return text || fallback;
+}
+
+function createDetailLine(label, value, isMultiLine = false) {
+  const row = document.createElement("p");
+  row.className = "detail-line";
+  const key = document.createElement("span");
+  key.className = "detail-line-label";
+  key.textContent = `${label}：`;
+  const val = document.createElement("span");
+  val.className = isMultiLine ? "detail-line-value multi" : "detail-line-value";
+  val.textContent = toDisplayText(value, "待补充");
+  row.append(key, val);
+  return row;
+}
+
+function createSourceLink(url) {
+  const text = toText(url);
+  if (!text) return "待补充";
+  if (/^https?:\/\//i.test(text)) {
+    const a = document.createElement("a");
+    a.href = text;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "查看线索";
+    return a;
+  }
+  return document.createTextNode(text);
+}
+
+function createDetailPanel(item, noteKey) {
+  const detailRow = document.createElement("tr");
+  detailRow.className = "detail-row";
+  detailRow.dataset.noteKey = noteKey;
+
+  const detailCell = document.createElement("td");
+  detailCell.colSpan = TABLE_COLUMN_COUNT;
+
+  const detailPanel = document.createElement("div");
+  detailPanel.className = "detail-panel";
+
+  const sectionA = document.createElement("div");
+  sectionA.className = "detail-section";
+  sectionA.appendChild(createDetailLine("基本情况", item.基本情况介绍 || buildBriefIntro(item), true));
+  sectionA.appendChild(createDetailLine("主要作物", item.主要作物));
+  sectionA.appendChild(createDetailLine("自有农田", item.自有农田));
+  sectionA.appendChild(createDetailLine("土地级别", item.土地级别 || item.经济规模 || "待核验"));
+
+  const sectionB = document.createElement("div");
+  sectionB.className = "detail-section";
+  sectionB.appendChild(createDetailLine("典型废弃物", item.典型废弃物));
+  sectionB.appendChild(createDetailLine("推荐路线", item.推荐路线));
+  sectionB.appendChild(createDetailLine("拜访建议", item.拜访建议, true));
+  sectionB.appendChild(createDetailLine("尽调问题", item.尽调问题, true));
+
+  const sectionC = document.createElement("div");
+  sectionC.className = "detail-section";
+  sectionC.appendChild(createDetailLine("可核验面积", item.农田面积));
+
+  const sourceLinkHost = createSourceLink(item.网址);
+  const sourceRow = document.createElement("p");
+  sourceRow.className = "detail-line";
+  const sourceLabel = document.createElement("span");
+  sourceLabel.className = "detail-line-label";
+  sourceLabel.textContent = "来源：";
+  sourceRow.append(sourceLabel, sourceLinkHost);
+  sectionC.appendChild(sourceRow);
+
+  const noteRow = document.createElement("div");
+  noteRow.className = "note-editor-wrap";
+  const noteTitle = document.createElement("div");
+  noteTitle.className = "note-title";
+  noteTitle.textContent = "备注";
+  const textarea = document.createElement("textarea");
+  textarea.className = "note-editor";
+  textarea.rows = 2;
+  textarea.placeholder = "点击输入备注并保存";
+  textarea.value = getNote(noteKey);
+  const actionLine = document.createElement("div");
+  actionLine.className = "note-action-row";
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "note-save-btn ghost";
+  saveBtn.textContent = "保存备注";
+  saveBtn.dataset.noteKey = noteKey;
+  const state = document.createElement("span");
+  state.className = "note-state";
+  state.dataset.noteKey = noteKey;
+  actionLine.append(saveBtn, state);
+  noteRow.append(noteTitle, textarea, actionLine);
+
+  detailPanel.append(sectionA, sectionB, sectionC, noteRow);
+  detailCell.appendChild(detailPanel);
+  detailRow.appendChild(detailCell);
+
+  return { detailRow, textarea, state };
+}
+
 function priorityToWeight(priority) {
   const map = {
     "S-立即拜访": 100,
@@ -665,7 +805,7 @@ function renderRows(filtered) {
     renderedRows = [];
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 16;
+    td.colSpan = TABLE_COLUMN_COUNT;
     td.className = "empty";
     td.textContent = "当前筛选条件下暂无结果，请调整筛选条件。";
     tr.appendChild(td);
@@ -687,12 +827,11 @@ function renderRows(filtered) {
   const frag = document.createDocumentFragment();
   sorted.forEach((item) => {
     const noteKey = getNoteStorageKey(item);
-    const noteContent = getNote(noteKey);
+    const isExpanded = isDetailExpanded(noteKey);
     const tr = document.createElement("tr");
-    const sourceLink = item.网址.startsWith("http://") || item.网址.startsWith("https://")
-      ? `<a href="${item.网址}" target="_blank" rel="noopener noreferrer">查看线索</a>`
-      : item.网址 || "";
-    const brief = item.基本情况介绍 || buildBriefIntro(item);
+    tr.dataset.noteKey = noteKey;
+    tr.className = "customer-row";
+    tr.classList.toggle("is-expanded", isExpanded);
     const priorityText = item.优先级 || "";
     const cooperationText = item.是否合作 || DEFAULT_COOP_STATUS;
 
@@ -703,37 +842,16 @@ function renderRows(filtered) {
       <td>${item.公司主体 || ""}</td>
       <td>${item.目标用户大类 || ""}</td>
       <td class="truncate">${item.主要作物 || ""}</td>
-      <td>${item.农田可用 || ""}</td>
       <td>${item.农田面积 || ""}</td>
       <td>${item.土地级别 || ""}</td>
-      <td>${item.经济规模 || ""}</td>
       <td class="priority-cell"></td>
-      <td>${item.总分 || ""}</td>
-      <td class="truncate">${item.典型废弃物 || ""}<br/>${sourceLink}</td>
-      <td class="truncate">${brief}</td>
       <td class="cooperation-cell"></td>
-      <td class="note-cell"></td>
+      <td>
+        <button type="button" class="detail-toggle ghost" data-note-key="${noteKey}" aria-expanded="${isExpanded ? "true" : "false"}">
+          ${isExpanded ? "收起详情" : "查看详情"}
+        </button>
+      </td>
     `;
-
-    const noteCell = tr.querySelector(".note-cell");
-    const textarea = document.createElement("textarea");
-    textarea.className = "note-editor";
-    textarea.rows = 2;
-    textarea.placeholder = "点击输入备注并保存";
-    textarea.value = noteContent;
-    const noteRow = document.createElement("div");
-    noteRow.className = "note-action-row";
-    const saveBtn = document.createElement("button");
-    saveBtn.type = "button";
-    saveBtn.className = "note-save-btn ghost";
-    saveBtn.textContent = "保存";
-    saveBtn.dataset.noteKey = noteKey;
-    const state = document.createElement("span");
-    state.className = "note-state";
-    state.dataset.noteKey = noteKey;
-    noteRow.append(saveBtn, state);
-    noteCell.appendChild(textarea);
-    noteCell.appendChild(noteRow);
 
     const priorityCell = tr.querySelector(".priority-cell");
     if (isEditMode) {
@@ -753,7 +871,18 @@ function renderRows(filtered) {
       cooperationCell.textContent = cooperationText;
     }
 
-  frag.appendChild(tr);
+    const { detailRow, textarea, state } = createDetailPanel(item, noteKey);
+    detailRow.hidden = !isExpanded;
+    state.dataset.noteKey = noteKey;
+    textarea.dataset.noteKey = noteKey;
+
+    const detailCell = detailRow.querySelector("td");
+    if (detailCell && item.来源) {
+      detailCell.dataset.source = item.来源;
+    }
+
+    frag.appendChild(tr);
+    frag.appendChild(detailRow);
   });
   els.rows.appendChild(frag);
 }
@@ -787,6 +916,29 @@ function saveCurrentRowNote(event) {
   setNote(key, textarea.value);
   updateNoteStatus(row, "已保存");
   clearNoteStatus(row);
+}
+
+function toggleDetail(event) {
+  const btn = event.target.closest(".detail-toggle");
+  if (!btn) return;
+  const key = btn.dataset.noteKey;
+  const baseRow = btn.closest("tr");
+  if (!baseRow) return;
+
+  let detailRow = baseRow.nextElementSibling;
+  if (!detailRow || !detailRow.classList.contains("detail-row")) {
+    detailRow = Array.from(baseRow.parentElement.children).find((el) => {
+      return el.tagName === "TR" && el.classList.contains("detail-row") && el.dataset.noteKey === key;
+    });
+  }
+  if (!detailRow) return;
+
+  const nextState = detailRow.hidden;
+  detailRow.hidden = !nextState;
+  baseRow.classList.toggle("is-expanded", nextState);
+  btn.textContent = nextState ? "收起详情" : "查看详情";
+  btn.setAttribute("aria-expanded", nextState ? "true" : "false");
+  setDetailExpanded(key, nextState);
 }
 
 function handleRowEditorChange(event) {
@@ -1114,6 +1266,7 @@ function bindEvents() {
   els.exportBtn.addEventListener("click", exportCSV);
   els.exportAllBtn.addEventListener("click", exportAllDatabase);
   els.rows.addEventListener("click", saveCurrentRowNote);
+  els.rows.addEventListener("click", toggleDetail);
   els.rows.addEventListener("change", handleRowEditorChange);
   els.restoreBtn.addEventListener("click", () => {
     const config = getDataModeConfig(currentSourceMode);
@@ -1127,6 +1280,7 @@ function bindEvents() {
 function boot() {
   noteStore = loadNoteStore();
   editStore = loadEditStore();
+  detailExpandStore = loadDetailExpandState();
   initDataModeSelector();
 
   const baseMode = getDataModeConfig(currentSourceMode);

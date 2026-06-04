@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>农业固废智能补给站-目标用户筛选中心</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="layout">
+    <header class="topbar">
+      <div class="title-wrap">
+        <h1>农业固废智能补给站 · 目标客户筛选</h1>
+        <p>基于现有数据库，支持按区域、优先级、经济规模、农田规模快速筛选</p>
+      </div>
+      <div class="summary" id="summary">读取中...</div>
+    </header>
+
+    <main class="content">
+      <aside class="panel">
+        <h2>筛选条件</h2>
+        <div class="row">
+          <label>企业关键词</label>
+          <input id="keyword" type="text" placeholder="输入公司/作物/作物类型" />
+        </div>
+
+        <div class="grid-2">
+          <div class="row">
+            <label>数据口径</label>
+            <select id="dataMode"></select>
+          </div>
+          <div class="row">
+            <label>优先级</label>
+            <select id="priority"></select>
+          </div>
+          <div class="row">
+            <label>客户大类</label>
+            <select id="category"></select>
+          </div>
+          <div class="row">
+            <label>省份</label>
+            <select id="province"></select>
+          </div>
+          <div class="row">
+            <label>地级市/区域</label>
+            <select id="city"></select>
+          </div>
+          <div class="row">
+            <label>经济规模</label>
+            <select id="econScale"></select>
+          </div>
+          <div class="row">
+            <label>农田面积级别</label>
+            <select id="landClass"></select>
+          </div>
+          <div class="row">
+            <label>自有农田</label>
+            <select id="farmFlag"></select>
+          </div>
+          <div class="row">
+            <label>合作状态</label>
+            <select id="cooperation"></select>
+          </div>
+          <div class="row">
+            <label>排序字段</label>
+            <select id="sortBy"></select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="resetBtn" type="button">重置筛选</button>
+          <button id="exportBtn" type="button" class="ghost">导出当前结果</button>
+          <button id="exportAllBtn" type="button">导出全部数据库</button>
+          <button id="editModeBtn" type="button" class="ghost">编辑客户（密码）</button>
+        </div>
+        <div class="file-row">
+          <label for="importFile">导入新清单（CSV / JSON）</label>
+          <input id="importFile" type="file" accept=".csv,.json,.xlsx,.xls" />
+          <button id="restoreBtn" type="button" class="ghost">恢复官方清单</button>
+        </div>
+        <div id="importStatus" class="hint">当前使用：官方综合/补充清单（278条）</div>
+        <p class="hint">说明：若“农田面积级别/经济规模”为“面积需核验/待核验”，建议先做尽调再定级。</p>
+      </aside>
+
+      <section class="table-wrap">
+        <div class="table-head">
+          <h2>客户列表</h2>
+          <div id="resultCount">0 条</div>
+        </div>
+        <section class="overview-board" id="overviewBoard">
+          <div class="metric-cards" id="metricCards"></div>
+
+          <div class="board-section">
+            <h3>按客户大类统计</h3>
+            <div id="categoryBoard" class="board-list"></div>
+          </div>
+
+          <div class="board-section">
+            <h3>按省份统计</h3>
+            <div id="provinceBoard" class="board-list"></div>
+          </div>
+
+          <div class="board-section">
+            <h3>按经济规模统计</h3>
+            <div id="scaleBoard" class="board-list"></div>
+          </div>
+        </section>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>省份</th>
+                <th>地级市</th>
+                <th>公司主体</th>
+                <th>客户大类</th>
+                <th>主要作物/产品</th>
+                <th>自有农田</th>
+                <th>农田面积</th>
+              <th>土地级别</th>
+              <th>经济规模</th>
+              <th>优先级</th>
+              <th>总分</th>
+              <th>典型废弃物</th>
+              <th>基本情况介绍</th>
+              <th>合作状态</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./data.js"></script>
+  <script src="./customer_raw_data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

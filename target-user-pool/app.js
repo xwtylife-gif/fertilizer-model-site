@@ -10,6 +10,17 @@ const DEFAULT_COOP_STATUS = "未合作";
 const TABLE_COLUMN_COUNT = 12;
 const SERVICE_CUSTOMER_DIRECTION = "服务目标客户（提供服务/项目）";
 const RAW_MATERIAL_CUSTOMER_DIRECTION = "原料产品客户（提供原料）";
+const MULTI_FILTER_IDS = new Set([
+  "priority",
+  "category",
+  "customerDirection",
+  "province",
+  "city",
+  "econScale",
+  "landClass",
+  "farmFlag",
+  "cooperation",
+]);
 const EDIT_PRIORITY_OPTIONS = [
   "S-立即拜访",
   "A-优先拜访",
@@ -289,10 +300,136 @@ function uniq(arr) {
   return [...new Set(arr.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), "zh-CN"));
 }
 
-function buildOptions(element, values) {
+function isMultiFilter(element) {
+  return Boolean(element && MULTI_FILTER_IDS.has(element.id));
+}
+
+function getSelectedValues(element) {
+  if (!element) return [ALL_TEXT];
+  if (!element.multiple) return [toText(element.value) || ALL_TEXT];
+  const selected = Array.from(element.selectedOptions || []).map((option) => option.value).filter(Boolean);
+  return selected.length ? selected : [ALL_TEXT];
+}
+
+function setSelectedValues(element, values, shouldSync = true) {
+  if (!element) return;
+  const incoming = Array.isArray(values) ? values.filter(Boolean) : [values].filter(Boolean);
+  const normalized = !incoming.length || incoming.includes(ALL_TEXT) ? [ALL_TEXT] : incoming;
+  Array.from(element.options || []).forEach((option) => {
+    option.selected = normalized.includes(option.value);
+  });
+  if (!Array.from(element.selectedOptions || []).length && element.options.length) {
+    element.options[0].selected = true;
+  }
+  if (shouldSync && isMultiFilter(element)) syncMultiSelect(element);
+}
+
+function matchesSelected(selectedValues, value) {
+  const selected = Array.isArray(selectedValues) && selectedValues.length ? selectedValues : [ALL_TEXT];
+  return selected.includes(ALL_TEXT) || selected.includes(toText(value));
+}
+
+function closeOtherMultiSelects(currentWrap) {
+  document.querySelectorAll(".multiselect.is-open").forEach((wrap) => {
+    if (wrap === currentWrap) return;
+    wrap.classList.remove("is-open");
+    const menu = wrap.querySelector(".multiselect-menu");
+    const trigger = wrap.querySelector(".multiselect-trigger");
+    if (menu) menu.hidden = true;
+    if (trigger) trigger.setAttribute("aria-expanded", "false");
+  });
+}
+
+function syncMultiSelect(element) {
+  if (!isMultiFilter(element)) return;
+  element.classList.add("native-select-hidden");
+  let wrap = document.querySelector(`.multiselect[data-for="${element.id}"]`);
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.className = "multiselect";
+    wrap.dataset.for = element.id;
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "multiselect-trigger";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.innerHTML = `<span class="multiselect-label"></span><span data-lucide="chevron-down" aria-hidden="true"></span>`;
+    const menu = document.createElement("div");
+    menu.className = "multiselect-menu";
+    menu.hidden = true;
+    wrap.append(trigger, menu);
+    element.insertAdjacentElement("afterend", wrap);
+    trigger.addEventListener("click", () => {
+      const isOpen = wrap.classList.toggle("is-open");
+      closeOtherMultiSelects(isOpen ? wrap : null);
+      menu.hidden = !isOpen;
+      trigger.setAttribute("aria-expanded", String(isOpen));
+    });
+  }
+
+  const selectedValues = getSelectedValues(element);
+  const selectedWithoutAll = selectedValues.filter((value) => value !== ALL_TEXT);
+  const label = wrap.querySelector(".multiselect-label");
+  if (label) {
+    label.textContent = selectedWithoutAll.length
+      ? selectedWithoutAll.length === 1
+        ? selectedWithoutAll[0]
+        : `已选 ${selectedWithoutAll.length} 项`
+      : ALL_TEXT;
+  }
+
+  const menu = wrap.querySelector(".multiselect-menu");
+  if (menu) {
+    menu.innerHTML = "";
+    Array.from(element.options).forEach((option) => {
+      const optionLabel = document.createElement("label");
+      optionLabel.className = "multiselect-option";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = option.value;
+      checkbox.checked = option.selected;
+      const text = document.createElement("span");
+      text.textContent = option.textContent;
+      optionLabel.append(checkbox, text);
+      checkbox.addEventListener("change", () => {
+        const checked = Array.from(menu.querySelectorAll("input:checked")).map((input) => input.value);
+        const nextValues = checkbox.value === ALL_TEXT && checkbox.checked
+          ? [ALL_TEXT]
+          : checked.filter((value) => value !== ALL_TEXT);
+        setSelectedValues(element, nextValues.length ? nextValues : [ALL_TEXT], false);
+        syncMultiSelect(element);
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      menu.appendChild(optionLabel);
+    });
+  }
+  renderIcons(wrap);
+}
+
+function setupMultiSelectClose() {
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".multiselect")) return;
+    closeOtherMultiSelects(null);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeOtherMultiSelects(null);
+  });
+}
+
+function buildOptions(element, values, options = {}) {
+  const includeAll = options.includeAll !== false;
+  const previousValues = getSelectedValues(element);
+  if (isMultiFilter(element)) element.multiple = true;
   element.innerHTML = "";
-  element.appendChild(new Option(ALL_TEXT, ALL_TEXT));
+  if (includeAll) element.appendChild(new Option(ALL_TEXT, ALL_TEXT));
   values.forEach((v) => element.appendChild(new Option(v, v)));
+  const validPrevious = previousValues.filter((value) => Array.from(element.options).some((option) => option.value === value));
+  if (validPrevious.length) {
+    setSelectedValues(element, validPrevious, false);
+  } else if (element.options.length) {
+    setSelectedValues(element, [element.options[0].value], false);
+  }
+  if (isMultiFilter(element)) syncMultiSelect(element);
 }
 
 function toMu(areaText) {
@@ -450,8 +587,9 @@ function normalizeRows(rawRows, source = "导入清单", dedupe = true) {
 }
 
 function buildCityOptions(selectedProvince) {
+  const selectedProvinces = Array.isArray(selectedProvince) ? selectedProvince : [selectedProvince || ALL_TEXT];
   const cities = currentRows
-    .filter((item) => selectedProvince === ALL_TEXT || item.省份 === selectedProvince)
+    .filter((item) => selectedProvinces.includes(ALL_TEXT) || selectedProvinces.includes(item.省份))
     .map((item) => item.地级市);
   buildOptions(els.city, uniq(cities));
 }
@@ -466,7 +604,7 @@ function initFilters() {
   buildOptions(els.landClass, uniq(currentRows.map((i) => i.土地级别)));
   buildOptions(els.farmFlag, uniq(currentRows.map((i) => i.农田可用)));
   buildOptions(els.cooperation, uniq(currentRows.map((i) => i.是否合作 || DEFAULT_COOP_STATUS)));
-  buildOptions(els.sortBy, ["综合排序（默认）", "优先级", "总分高→低", "总分低→高", "省份", "地级市"]);
+  buildOptions(els.sortBy, ["综合排序（默认）", "优先级", "总分高→低", "总分低→高", "省份", "地级市"], { includeAll: false });
 }
 
 function updateSummary() {
@@ -896,8 +1034,8 @@ function renderRows(filtered) {
 
     tr.innerHTML = `
       <td>${escapeHtml(item.序号)}</td>
-      <td>${escapeHtml(item.省份)}</td>
-      <td>${escapeHtml(item.地级市)}</td>
+      <td class="province-cell">${escapeHtml(item.省份)}</td>
+      <td class="city-cell">${escapeHtml(item.地级市)}</td>
       <td class="company-cell">${escapeHtml(item.公司主体)}</td>
       <td>${escapeHtml(item.目标用户大类)}</td>
       <td class="direction-cell"></td>
@@ -1056,27 +1194,27 @@ function toggleEditMode() {
 function applyFilters() {
   const keyword = toText(els.keyword.value).toLowerCase();
   const cond = {
-    priority: els.priority.value,
-    category: els.category.value,
-    customerDirection: els.customerDirection.value,
-    province: els.province.value,
-    city: els.city.value,
-    econScale: els.econScale.value,
-    landClass: els.landClass.value,
-    farmFlag: els.farmFlag.value,
-    cooperation: els.cooperation.value,
+    priority: getSelectedValues(els.priority),
+    category: getSelectedValues(els.category),
+    customerDirection: getSelectedValues(els.customerDirection),
+    province: getSelectedValues(els.province),
+    city: getSelectedValues(els.city),
+    econScale: getSelectedValues(els.econScale),
+    landClass: getSelectedValues(els.landClass),
+    farmFlag: getSelectedValues(els.farmFlag),
+    cooperation: getSelectedValues(els.cooperation),
   };
 
   const filtered = currentRows.filter((item) => {
-    if (cond.priority !== ALL_TEXT && item.优先级 !== cond.priority) return false;
-    if (cond.category !== ALL_TEXT && item.目标用户大类 !== cond.category) return false;
-    if (cond.customerDirection !== ALL_TEXT && (item.客户方向 || SERVICE_CUSTOMER_DIRECTION) !== cond.customerDirection) return false;
-    if (cond.province !== ALL_TEXT && item.省份 !== cond.province) return false;
-    if (cond.city !== ALL_TEXT && item.地级市 !== cond.city) return false;
-    if (cond.econScale !== ALL_TEXT && item.经济规模 !== cond.econScale) return false;
-    if (cond.landClass !== ALL_TEXT && item.土地级别 !== cond.landClass) return false;
-    if (cond.farmFlag !== ALL_TEXT && item.农田可用 !== cond.farmFlag) return false;
-    if (cond.cooperation !== ALL_TEXT && (item.是否合作 || DEFAULT_COOP_STATUS) !== cond.cooperation) return false;
+    if (!matchesSelected(cond.priority, item.优先级)) return false;
+    if (!matchesSelected(cond.category, item.目标用户大类)) return false;
+    if (!matchesSelected(cond.customerDirection, item.客户方向 || SERVICE_CUSTOMER_DIRECTION)) return false;
+    if (!matchesSelected(cond.province, item.省份)) return false;
+    if (!matchesSelected(cond.city, item.地级市)) return false;
+    if (!matchesSelected(cond.econScale, item.经济规模)) return false;
+    if (!matchesSelected(cond.landClass, item.土地级别)) return false;
+    if (!matchesSelected(cond.farmFlag, item.农田可用)) return false;
+    if (!matchesSelected(cond.cooperation, item.是否合作 || DEFAULT_COOP_STATUS)) return false;
     if (!matchText(item, keyword)) return false;
     return true;
   });
@@ -1092,19 +1230,19 @@ function setCurrentRows(rows, sourceName, keepFilters = false, mode = currentSou
   els.importStatus.textContent = `当前使用：${currentSourceName}（${currentRows.length}条）`;
   initFilters();
   updateSummary();
-  buildCityOptions(els.province.value || ALL_TEXT);
+  buildCityOptions(getSelectedValues(els.province));
   if (!keepFilters) {
     els.keyword.value = "";
-    els.priority.value = ALL_TEXT;
-    els.category.value = ALL_TEXT;
-    els.customerDirection.value = ALL_TEXT;
-    els.province.value = ALL_TEXT;
+    setSelectedValues(els.priority, [ALL_TEXT]);
+    setSelectedValues(els.category, [ALL_TEXT]);
+    setSelectedValues(els.customerDirection, [ALL_TEXT]);
+    setSelectedValues(els.province, [ALL_TEXT]);
     buildCityOptions(ALL_TEXT);
-    els.city.value = ALL_TEXT;
-    els.econScale.value = ALL_TEXT;
-    els.landClass.value = ALL_TEXT;
-    els.farmFlag.value = ALL_TEXT;
-    els.cooperation.value = ALL_TEXT;
+    setSelectedValues(els.city, [ALL_TEXT]);
+    setSelectedValues(els.econScale, [ALL_TEXT]);
+    setSelectedValues(els.landClass, [ALL_TEXT]);
+    setSelectedValues(els.farmFlag, [ALL_TEXT]);
+    setSelectedValues(els.cooperation, [ALL_TEXT]);
     els.sortBy.value = "综合排序（默认）";
   }
   applyFilters();
@@ -1297,7 +1435,7 @@ function bindEvents() {
   els.category.addEventListener("change", applyFilters);
   els.customerDirection.addEventListener("change", applyFilters);
   els.province.addEventListener("change", () => {
-    buildCityOptions(els.province.value || ALL_TEXT);
+    buildCityOptions(getSelectedValues(els.province));
     applyFilters();
   });
   els.city.addEventListener("change", applyFilters);
@@ -1340,6 +1478,7 @@ function boot() {
   setEditModeButton();
   renderIcons();
   setCurrentRows(baseRows, buildSourceName(), false, baseMode.value);
+  setupMultiSelectClose();
   bindEvents();
 }
 

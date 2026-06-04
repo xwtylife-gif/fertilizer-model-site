@@ -10,6 +10,7 @@
   <div class="layout">
     <header class="topbar">
       <div class="title-wrap">
+        <div class="eyebrow">客户拓展工作台</div>
         <h1>农业固废智能补给站 · 目标客户筛选</h1>
         <p>基于现有数据库，支持按区域、优先级、经济规模、农田规模快速筛选</p>
       </div>
@@ -18,7 +19,7 @@
 
     <main class="content">
       <aside class="panel">
-        <h2>筛选条件</h2>
+        <h2><span data-lucide="sliders-horizontal"></span>筛选条件</h2>
         <div class="row">
           <label>企业关键词</label>
           <input id="keyword" type="text" placeholder="输入公司/作物/作物类型" />
@@ -68,15 +69,15 @@
         </div>
 
         <div class="actions">
-          <button id="resetBtn" type="button">重置筛选</button>
-          <button id="exportBtn" type="button" class="ghost">导出当前结果</button>
-          <button id="exportAllBtn" type="button">导出全部数据库</button>
-          <button id="editModeBtn" type="button" class="ghost">编辑客户（密码）</button>
+          <button id="resetBtn" type="button" class="secondary"><span data-lucide="rotate-ccw"></span>重置筛选</button>
+          <button id="exportBtn" type="button" class="secondary"><span data-lucide="download"></span>导出当前结果</button>
+          <button id="exportAllBtn" type="button"><span data-lucide="database"></span>导出全部数据库</button>
+          <button id="editModeBtn" type="button" class="ghost"><span data-lucide="lock-keyhole"></span>编辑客户</button>
         </div>
         <div class="file-row">
           <label for="importFile">导入新清单（CSV / JSON）</label>
           <input id="importFile" type="file" accept=".csv,.json,.xlsx,.xls" />
-          <button id="restoreBtn" type="button" class="ghost">恢复官方清单</button>
+          <button id="restoreBtn" type="button" class="ghost"><span data-lucide="archive-restore"></span>恢复官方清单</button>
         </div>
         <div id="importStatus" class="hint">当前使用：官方综合/补充清单（278条）</div>
         <p class="hint">说明：若“农田面积级别/经济规模”为“面积需核验/待核验”，建议先做尽调再定级。</p>
@@ -84,7 +85,7 @@
 
       <section class="table-wrap">
         <div class="table-head">
-          <h2>客户列表</h2>
+          <h2><span data-lucide="list-filter"></span>客户列表</h2>
           <div id="resultCount">0 条</div>
         </div>
         <section class="overview-board" id="overviewBoard">
@@ -132,6 +133,7 @@
   <script src="./data.js"></script>
   <script src="./customer_raw_data.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="./app.js"></script>
 </body>
 </html>

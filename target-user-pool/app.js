@@ -139,6 +139,43 @@ function toText(v) {
   return (v === undefined || v === null) ? "" : String(v).trim();
 }
 
+function escapeHtml(value) {
+  return toText(value).replace(/[&<>"']/g, (char) => {
+    const map = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return map[char] || char;
+  });
+}
+
+function renderIcons(root = document) {
+  if (window.lucide && typeof window.lucide.createIcons === "function") {
+    window.lucide.createIcons({
+      attrs: {
+        "stroke-width": 1.8,
+      },
+      root,
+    });
+  }
+}
+
+function iconMarkup(name) {
+  return `<span data-lucide="${name}" aria-hidden="true"></span>`;
+}
+
+function setEditModeButton() {
+  if (!els.editModeBtn) return;
+  els.editModeBtn.classList.toggle("ghost", !isEditMode);
+  els.editModeBtn.innerHTML = isEditMode
+    ? `${iconMarkup("unlock-keyhole")}退出编辑`
+    : `${iconMarkup("lock-keyhole")}编辑客户`;
+  renderIcons(els.editModeBtn);
+}
+
 function getNoteStorageKey(item) {
   if (!item || typeof item !== "object") return "";
   if (item._noteKey) return toText(item._noteKey);
@@ -742,7 +779,7 @@ function createDetailPanel(item, noteKey) {
   const saveBtn = document.createElement("button");
   saveBtn.type = "button";
   saveBtn.className = "note-save-btn ghost";
-  saveBtn.textContent = "保存备注";
+  saveBtn.innerHTML = `${iconMarkup("save")}保存备注`;
   saveBtn.dataset.noteKey = noteKey;
   const state = document.createElement("span");
   state.className = "note-state";
@@ -753,8 +790,28 @@ function createDetailPanel(item, noteKey) {
   detailPanel.append(sectionA, sectionB, sectionC, noteRow);
   detailCell.appendChild(detailPanel);
   detailRow.appendChild(detailCell);
+  renderIcons(detailRow);
 
   return { detailRow, textarea, state };
+}
+
+function createEmptyDetailRow(noteKey) {
+  const detailRow = document.createElement("tr");
+  detailRow.className = "detail-row";
+  detailRow.dataset.noteKey = noteKey;
+  detailRow.hidden = true;
+
+  const detailCell = document.createElement("td");
+  detailCell.colSpan = TABLE_COLUMN_COUNT;
+  detailRow.appendChild(detailCell);
+  return detailRow;
+}
+
+function fillDetailRow(detailRow, item, noteKey) {
+  if (!detailRow || detailRow.querySelector(".detail-panel")) return;
+  const filled = createDetailPanel(item, noteKey);
+  detailRow.replaceChildren(...Array.from(filled.detailRow.childNodes));
+  detailRow.dataset.noteKey = noteKey;
 }
 
 function priorityToWeight(priority) {
@@ -767,6 +824,36 @@ function priorityToWeight(priority) {
     "C-储备/尽调": 30,
   };
   return map[priority] || 20;
+}
+
+function createBadge(text, type) {
+  const badge = document.createElement("span");
+  const normalized = toText(text) || "待确认";
+  badge.className = `status-badge ${type || ""}`;
+  badge.textContent = normalized;
+  return badge;
+}
+
+function getPriorityBadgeType(priority) {
+  const text = toText(priority);
+  if (text.startsWith("S")) return "priority-s";
+  if (text.startsWith("A")) return "priority-a";
+  if (text.startsWith("B")) return "priority-b";
+  return "priority-c";
+}
+
+function getCoopBadgeType(status) {
+  const text = normalizeCoopStatus(status);
+  if (text === "已合作") return "coop-done";
+  if (text === "待确认") return "coop-pending";
+  return "coop-none";
+}
+
+function setDetailToggleButton(button, isExpanded) {
+  if (!button) return;
+  button.classList.toggle("is-open", isExpanded);
+  button.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+  button.textContent = isExpanded ? "收起" : "详情";
 }
 
 function createSelectEditor(options, selectedValue, field, noteKey) {
@@ -836,21 +923,17 @@ function renderRows(filtered) {
     const cooperationText = item.是否合作 || DEFAULT_COOP_STATUS;
 
     tr.innerHTML = `
-      <td>${item.序号 || ""}</td>
-      <td>${item.省份 || ""}</td>
-      <td>${item.地级市 || ""}</td>
-      <td>${item.公司主体 || ""}</td>
-      <td>${item.目标用户大类 || ""}</td>
-      <td class="truncate">${item.主要作物 || ""}</td>
-      <td>${item.农田面积 || ""}</td>
-      <td>${item.土地级别 || ""}</td>
+      <td>${escapeHtml(item.序号)}</td>
+      <td>${escapeHtml(item.省份)}</td>
+      <td>${escapeHtml(item.地级市)}</td>
+      <td class="company-cell">${escapeHtml(item.公司主体)}</td>
+      <td>${escapeHtml(item.目标用户大类)}</td>
+      <td class="truncate">${escapeHtml(item.主要作物)}</td>
+      <td>${escapeHtml(item.农田面积)}</td>
+      <td>${escapeHtml(item.土地级别)}</td>
       <td class="priority-cell"></td>
       <td class="cooperation-cell"></td>
-      <td>
-        <button type="button" class="detail-toggle ghost" data-note-key="${noteKey}" aria-expanded="${isExpanded ? "true" : "false"}">
-          ${isExpanded ? "收起详情" : "查看详情"}
-        </button>
-      </td>
+      <td class="detail-cell"></td>
     `;
 
     const priorityCell = tr.querySelector(".priority-cell");
@@ -859,7 +942,7 @@ function renderRows(filtered) {
       prioritySelect.value = priorityText;
       priorityCell.appendChild(prioritySelect);
     } else {
-      priorityCell.textContent = priorityText;
+      priorityCell.appendChild(createBadge(priorityText, getPriorityBadgeType(priorityText)));
     }
 
     const cooperationCell = tr.querySelector(".cooperation-cell");
@@ -868,17 +951,24 @@ function renderRows(filtered) {
       cooperationSelect.value = cooperationText;
       cooperationCell.appendChild(cooperationSelect);
     } else {
-      cooperationCell.textContent = cooperationText;
+      cooperationCell.appendChild(createBadge(cooperationText, getCoopBadgeType(cooperationText)));
     }
 
-    const { detailRow, textarea, state } = createDetailPanel(item, noteKey);
-    detailRow.hidden = !isExpanded;
-    state.dataset.noteKey = noteKey;
-    textarea.dataset.noteKey = noteKey;
+    const detailCell = tr.querySelector(".detail-cell");
+    const detailButton = document.createElement("button");
+    detailButton.type = "button";
+    detailButton.className = "detail-toggle ghost";
+    detailButton.dataset.noteKey = noteKey;
+    setDetailToggleButton(detailButton, isExpanded);
+    detailCell.appendChild(detailButton);
 
-    const detailCell = detailRow.querySelector("td");
-    if (detailCell && item.来源) {
-      detailCell.dataset.source = item.来源;
+    const detailPackage = isExpanded ? createDetailPanel(item, noteKey) : { detailRow: createEmptyDetailRow(noteKey) };
+    const { detailRow } = detailPackage;
+    detailRow.hidden = !isExpanded;
+
+    const detailPanelCell = detailRow.querySelector("td");
+    if (detailPanelCell && item.来源) {
+      detailPanelCell.dataset.source = item.来源;
     }
 
     frag.appendChild(tr);
@@ -934,10 +1024,13 @@ function toggleDetail(event) {
   if (!detailRow) return;
 
   const nextState = detailRow.hidden;
+  if (nextState && !detailRow.querySelector(".detail-panel")) {
+    const targetItem = renderedRows.find((row) => getNoteStorageKey(row) === key);
+    if (targetItem) fillDetailRow(detailRow, targetItem, key);
+  }
   detailRow.hidden = !nextState;
   baseRow.classList.toggle("is-expanded", nextState);
-  btn.textContent = nextState ? "收起详情" : "查看详情";
-  btn.setAttribute("aria-expanded", nextState ? "true" : "false");
+  setDetailToggleButton(btn, nextState);
   setDetailExpanded(key, nextState);
 }
 
@@ -965,20 +1058,14 @@ function ensureEditMode() {
     return false;
   }
   isEditMode = true;
-  if (els.editModeBtn) {
-    els.editModeBtn.textContent = "退出编辑";
-    els.editModeBtn.classList.remove("ghost");
-  }
+  setEditModeButton();
   applyFilters();
   return true;
 }
 
 function exitEditMode() {
   isEditMode = false;
-  if (els.editModeBtn) {
-    els.editModeBtn.textContent = "编辑客户（密码）";
-    els.editModeBtn.classList.add("ghost");
-  }
+  setEditModeButton();
   applyFilters();
 }
 
@@ -1291,10 +1378,8 @@ function boot() {
     els.resultCount.textContent = "0 条";
     return;
   }
-  if (els.editModeBtn) {
-    els.editModeBtn.textContent = "编辑客户（密码）";
-    els.editModeBtn.classList.add("ghost");
-  }
+  setEditModeButton();
+  renderIcons();
   setCurrentRows(baseRows, buildSourceName(baseMode.value), false, baseMode.value);
   bindEvents();
 }
